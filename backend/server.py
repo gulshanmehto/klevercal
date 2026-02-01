@@ -3,6 +3,7 @@ from fastapi.responses import RedirectResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+import pymongo
 import os
 import logging
 from pathlib import Path
@@ -82,6 +83,14 @@ class UserResponse(BaseModel):
     picture: Optional[str] = None
     brand_color: str = "#7c3aed"
     timezone: str = "UTC"
+    welcome_message: Optional[str] = ""
+    language: str = "English"
+    date_format: str = "DD/MM/YYYY"
+    time_format: str = "12h"
+    country: str = "India"
+    logo_url: Optional[str] = None
+    use_branding: bool = True
+    slug: Optional[str] = None
     google_calendar_connected: bool = False
     created_at: datetime
 
@@ -599,6 +608,13 @@ async def register(user_data: UserCreate):
         "picture": None,
         "brand_color": "#7c3aed",
         "timezone": "UTC",
+        "welcome_message": "Welcome to my scheduling page. Please follow the instructions to add an event to my calendar.",
+        "language": "English",
+        "date_format": "DD/MM/YYYY",
+        "time_format": "12h",
+        "country": "India",
+        "use_branding": True,
+        "slug": user_data.name.lower().replace(" ", "-") + "-" + uuid.uuid4().hex[:4],
         "google_calendar_connected": False,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
@@ -924,7 +940,16 @@ async def get_public_user(user_id: str):
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0, "google_tokens": 0})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return {"user_id": user["user_id"], "name": user["name"], "picture": user.get("picture"), "brand_color": user.get("brand_color", "#7c3aed")}
+    return {
+        "user_id": user["user_id"], 
+        "name": user["name"], 
+        "picture": user.get("picture"), 
+        "brand_color": user.get("brand_color", "#7c3aed"),
+        "welcome_message": user.get("welcome_message"),
+        "logo_url": user.get("logo_url"),
+        "use_branding": user.get("use_branding", True),
+        "slug": user.get("slug")
+    }
 
 @api_router.get("/public/booking-types/{user_id}")
 async def get_public_booking_types(user_id: str):
@@ -940,7 +965,16 @@ async def get_public_booking_type_by_slug(slug: str):
     user = await db.users.find_one({"user_id": bt["user_id"]}, {"_id": 0, "password_hash": 0, "google_tokens": 0})
     return {
         "booking_type": bt,
-        "host": {"user_id": user["user_id"], "name": user["name"], "picture": user.get("picture"), "brand_color": user.get("brand_color", "#7c3aed")}
+        "host": {
+            "user_id": user["user_id"], 
+            "name": user["name"], 
+            "picture": user.get("picture"), 
+            "brand_color": user.get("brand_color", "#7c3aed"),
+            "welcome_message": user.get("welcome_message"),
+            "logo_url": user.get("logo_url"),
+            "use_branding": user.get("use_branding", True),
+            "slug": user.get("slug")
+        }
     }
 
 @api_router.get("/public/availability/{user_id}")
@@ -1250,8 +1284,21 @@ Form Responses: {data.answers}"""
 @api_router.put("/profile")
 async def update_profile(request: Request, user: dict = Depends(get_current_user)):
     body = await request.json()
-    allowed_fields = ["name", "brand_color", "timezone", "picture"]
+    allowed_fields = [
+        "name", "brand_color", "timezone", "picture", 
+        "welcome_message", "language", "date_format", 
+        "time_format", "country", "use_branding", "slug"
+    ]
     update_data = {k: v for k, v in body.items() if k in allowed_fields}
+    
+    if "slug" in update_data:
+        # Check if slug is unique
+        existing = await db.users.find_one({
+            "slug": update_data["slug"], 
+            "user_id": {"$ne": user["user_id"]}
+        })
+        if existing:
+            raise HTTPException(status_code=400, detail="This link is already taken. Please try another one.")
     
     if update_data:
         await db.users.update_one({"user_id": user["user_id"]}, {"$set": update_data})
@@ -1321,6 +1368,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(pymongo.errors.ServerSelectionTimeoutError)
+async def mongo_connection_handler(request: Request, exc: pymongo.errors.ServerSelectionTimeoutError):
+    return Response(
+        content=json.dumps({"detail": "Database connection failed. Please ensure MongoDB is running."}),
+        status_code=503,
+        media_type="application/json"
+    )
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

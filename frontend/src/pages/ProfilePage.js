@@ -1,122 +1,65 @@
 import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { DashboardLayout } from "./DashboardPage";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
+import { Textarea } from "../components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { User, Save, Loader2, Palette, Globe, Copy, ExternalLink, Calendar, Check, X, Link2 } from "lucide-react";
+import { Switch } from "../components/ui/switch";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from "../components/ui/select";
+import {
+  User, Camera, Trash2, Globe, Clock, Calendar,
+  MapPin, Languages, Palette, Link2, ChevronLeft,
+  Loader2, Save, ExternalLink
+} from "lucide-react";
 import { toast } from "sonner";
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import { API_URL as API } from "../config";
 
 const ProfilePage = () => {
   const { user, getAuthHeaders, checkAuth } = useAuth();
   const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "profile");
+
   const [formData, setFormData] = useState({
     name: "",
+    welcome_message: "",
+    language: "English",
+    date_format: "DD/MM/YYYY",
+    time_format: "12h",
+    country: "India",
+    timezone: "UTC",
     brand_color: "#7c3aed",
-    timezone: "UTC"
+    use_branding: true,
+    slug: ""
   });
+
   const [saving, setSaving] = useState(false);
-  const [bookingTypes, setBookingTypes] = useState([]);
-  const [calendarStatus, setCalendarStatus] = useState({ connected: false, loading: true });
-  const [connectingCalendar, setConnectingCalendar] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
       setFormData({
-        name: user.name || "",
-        brand_color: user.brand_color || "#7c3aed",
-        timezone: user.timezone || "UTC"
+        name: user.name ?? "",
+        welcome_message: user.welcome_message ?? "Welcome to my scheduling page. Please follow the instructions to add an event to my calendar.",
+        language: user.language ?? "English",
+        date_format: user.date_format ?? "DD/MM/YYYY",
+        time_format: user.time_format ?? "12h",
+        country: user.country ?? "India",
+        timezone: user.timezone ?? "UTC",
+        brand_color: user.brand_color ?? "#7c3aed",
+        use_branding: user.use_branding !== undefined ? user.use_branding : true,
+        slug: user.slug ?? ""
       });
+      setLoading(false);
     }
-    fetchBookingTypes();
-    fetchCalendarStatus();
+  }, [user]);
 
-    // Check if redirected from calendar connection
-    if (searchParams.get("calendar_connected") === "true") {
-      toast.success("Google Calendar connected successfully!");
-      fetchCalendarStatus();
-    }
-  }, [user, searchParams]);
-
-  const fetchBookingTypes = async () => {
-    try {
-      const response = await fetch(`${API}/booking-types`, {
-        headers: getAuthHeaders(),
-        credentials: "include"
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setBookingTypes(data);
-      }
-    } catch (error) {
-      console.error("Fetch error:", error);
-    }
-  };
-
-  const fetchCalendarStatus = async () => {
-    try {
-      const response = await fetch(`${API}/calendar/google/status`, {
-        headers: getAuthHeaders(),
-        credentials: "include"
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setCalendarStatus({ connected: data.connected, loading: false });
-      }
-    } catch (error) {
-      console.error("Calendar status error:", error);
-      setCalendarStatus({ connected: false, loading: false });
-    }
-  };
-
-  const handleConnectCalendar = async () => {
-    setConnectingCalendar(true);
-    try {
-      const response = await fetch(`${API}/calendar/google/connect`, {
-        headers: getAuthHeaders(),
-        credentials: "include"
-      });
-      if (response.ok) {
-        const data = await response.json();
-        // Redirect to Google OAuth
-        window.location.href = data.authorization_url;
-      } else {
-        toast.error("Failed to initiate calendar connection");
-      }
-    } catch (error) {
-      toast.error("An error occurred");
-    } finally {
-      setConnectingCalendar(false);
-    }
-  };
-
-  const handleDisconnectCalendar = async () => {
-    if (!confirm("Are you sure you want to disconnect Google Calendar?")) return;
-
-    try {
-      const response = await fetch(`${API}/calendar/google/disconnect`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        credentials: "include"
-      });
-      if (response.ok) {
-        toast.success("Google Calendar disconnected");
-        setCalendarStatus({ connected: false, loading: false });
-      } else {
-        toast.error("Failed to disconnect calendar");
-      }
-    } catch (error) {
-      toast.error("An error occurred");
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleUpdate = async (e) => {
+    if (e) e.preventDefault();
     setSaving(true);
     try {
       const response = await fetch(`${API}/profile`, {
@@ -127,10 +70,11 @@ const ProfilePage = () => {
       });
 
       if (response.ok) {
-        toast.success("Profile updated!");
+        toast.success("Settings updated successfully!");
         checkAuth();
       } else {
-        toast.error("Failed to update profile");
+        const data = await response.json();
+        toast.error(data.detail || "Failed to update settings");
       }
     } catch (error) {
       toast.error("An error occurred");
@@ -139,195 +83,287 @@ const ProfilePage = () => {
     }
   };
 
-  const colorOptions = [
-    "#7c3aed", "#6366f1", "#3b82f6", "#10b981",
-    "#f59e0b", "#ef4444", "#ec4899", "#6b7280"
+  const menuItems = [
+    { id: "profile", label: "Profile", icon: User },
+    { id: "branding", label: "Branding", icon: Palette },
+    { id: "mylink", label: "My Link", icon: Link2 },
   ];
 
   const timezones = [
-    "UTC",
-    "America/New_York",
-    "America/Chicago",
-    "America/Denver",
-    "America/Los_Angeles",
-    "Europe/London",
-    "Europe/Paris",
-    "Asia/Tokyo",
-    "Asia/Shanghai",
-    "Australia/Sydney"
+    "UTC", "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
+    "Europe/London", "Europe/Paris", "Asia/Tokyo", "Asia/Shanghai", "Australia/Sydney", "Asia/Kolkata"
   ];
 
-  const copyLink = (slug) => {
-    const link = `${window.location.origin}/book/${slug}`;
-    navigator.clipboard.writeText(link);
-    toast.success("Link copied!");
-  };
+  const languages = ["English", "Spanish", "French", "German", "Hindi", "Japanese", "Chinese"];
+  const dateFormats = ["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"];
+  const timeFormats = ["12h (am/pm)", "24h"];
+  const countries = ["India", "United States", "United Kingdom", "Canada", "Australia", "Germany", "France"];
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <Loader2 className="w-8 h-8 animate-spin text-violet-600" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
-      <div className="p-8 max-w-4xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Profile</h1>
-          <p className="text-slate-600 dark:text-slate-400">
-            Manage your account, calendar integrations, and branding
-          </p>
-        </div>
-
-        <div className="space-y-6">
-
-
-          {/* Account Info */}
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                <User className="w-5 h-5 text-violet-600" />
-                Account Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input
-                    value={user?.email || ""}
-                    disabled
-                    className="bg-slate-100 dark:bg-slate-800"
-                    data-testid="profile-email-input"
-                  />
-                  <p className="text-xs text-slate-500">Email cannot be changed</p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Display Name</Label>
-                  <Input
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Your name"
-                    data-testid="profile-name-input"
-                  />
-                </div>
-
-                <Button
-                  type="submit"
-                  disabled={saving}
-                  className="rounded-full bg-violet-600 hover:bg-violet-700"
-                  data-testid="save-profile-btn"
+      <div className="flex min-h-[calc(100vh-4rem)]">
+        {/* Settings Sidebar */}
+        <aside className="w-64 border-r border-slate-200 dark:border-slate-800 p-6 space-y-8 bg-white dark:bg-slate-900/50">
+          <div>
+            <Link to="/dashboard" className="text-sm font-medium text-slate-500 hover:text-violet-600 flex items-center gap-1 mb-6">
+              <ChevronLeft className="w-4 h-4" />
+              Back to home
+            </Link>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Account settings</h2>
+            <nav className="space-y-1">
+              {menuItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${activeTab === item.id
+                    ? "bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 shadow-sm"
+                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    }`}
                 >
-                  {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                  Save Changes
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+                  <item.icon className={`w-5 h-5 ${activeTab === item.id ? "text-violet-600" : "text-slate-400"}`} />
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+          </div>
 
-          {/* Branding */}
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                <Palette className="w-5 h-5 text-violet-600" />
-                Branding
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-3">
-                <Label>Brand Color</Label>
-                <div className="flex gap-3">
-                  {colorOptions.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, brand_color: color })}
-                      className={`w-10 h-10 rounded-full border-2 transition-transform hover:scale-110 ${formData.brand_color === color
-                          ? "border-slate-900 dark:border-white scale-110"
-                          : "border-transparent"
-                        }`}
-                      style={{ backgroundColor: color }}
-                      data-testid={`color-${color}`}
-                    />
-                  ))}
+          <div className="pt-8 border-t border-slate-100 dark:border-slate-800 space-y-1">
+            <Button variant="ghost" className="w-full justify-start text-slate-500 hover:text-slate-900 px-4">Login preferences</Button>
+            <Button variant="ghost" className="w-full justify-start text-slate-500 hover:text-slate-900 px-4">Security</Button>
+            <Button variant="ghost" className="w-full justify-start text-slate-500 hover:text-slate-900 px-4">Cookie settings</Button>
+          </div>
+        </aside>
+
+        {/* Main Content Area */}
+        <main className="flex-1 bg-slate-50/30 dark:bg-slate-950 p-12">
+          <div className="max-w-3xl mx-auto">
+            <header className="mb-10">
+              <div className="text-sm text-slate-500 font-medium mb-1 capitalize">Account details</div>
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-white capitalize">{activeTab.replace("mylink", "My link")}</h1>
+            </header>
+
+            {/* Profile Tab */}
+            {activeTab === "profile" && (
+              <div className="space-y-10">
+                {/* Avatar Section */}
+                <div className="flex items-center gap-6">
+                  <div className="relative group">
+                    <div className="w-24 h-24 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center overflow-hidden border-2 border-white dark:border-slate-800 shadow-lg">
+                      {user?.picture ? (
+                        <img src={user.picture} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-3xl font-bold text-violet-700 dark:text-violet-300">
+                          {user?.name?.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <button className="absolute inset-0 bg-black/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 rounded-full transition-opacity">
+                      <Camera className="w-6 h-6" />
+                    </button>
+                  </div>
+                  <div className="flex gap-3">
+                    <Button variant="outline" className="rounded-full px-6">Update</Button>
+                    <Button variant="ghost" className="rounded-full text-slate-500 hover:text-rose-600">
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Remove
+                    </Button>
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Globe className="w-4 h-4" />
-                  Timezone
-                </Label>
-                <select
-                  value={formData.timezone}
-                  onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
-                  className="w-full h-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3"
-                  data-testid="timezone-select"
-                >
-                  {timezones.map((tz) => (
-                    <option key={tz} value={tz}>{tz}</option>
-                  ))}
-                </select>
-              </div>
+                <form onSubmit={handleUpdate} className="space-y-8">
+                  <div className="grid gap-6">
+                    <div className="space-y-2">
+                      <Label className="text-slate-700 dark:text-slate-300 font-semibold">Name</Label>
+                      <Input
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        className="h-12 bg-white dark:bg-slate-900 border-slate-200"
+                        placeholder="John Doe"
+                      />
+                    </div>
 
-              <Button
-                onClick={handleSubmit}
-                disabled={saving}
-                className="rounded-full bg-violet-600 hover:bg-violet-700"
-                data-testid="save-branding-btn"
-              >
-                {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                Save Branding
-              </Button>
-            </CardContent>
-          </Card>
+                    <div className="space-y-2">
+                      <Label className="text-slate-700 dark:text-slate-300 font-semibold">Welcome Message</Label>
+                      <Textarea
+                        value={formData.welcome_message}
+                        onChange={(e) => setFormData({ ...formData, welcome_message: e.target.value })}
+                        className="min-h-[120px] bg-white dark:bg-slate-900 border-slate-200 resize-none py-3"
+                        placeholder="Welcome to my scheduling page..."
+                      />
+                    </div>
 
-          {/* Booking Links */}
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                <ExternalLink className="w-5 h-5 text-violet-600" />
-                Your Booking Links
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {bookingTypes.length === 0 ? (
-                <p className="text-slate-600 dark:text-slate-400">No meeting types created yet</p>
-              ) : (
-                bookingTypes.map((type) => (
-                  <div
-                    key={type.booking_type_id}
-                    className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50"
-                    data-testid={`booking-link-${type.booking_type_id}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-3 h-8 rounded-full" style={{ backgroundColor: type.color }} />
-                      <div>
-                        <div className="font-medium text-slate-900 dark:text-white">{type.title}</div>
-                        <div className="text-sm text-slate-600 dark:text-slate-400">
-                          {window.location.origin}/book/{type.slug}
-                        </div>
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label className="text-slate-700 dark:text-slate-300 font-semibold">Language</Label>
+                        <Select value={formData.language} onValueChange={(v) => setFormData({ ...formData, language: v })}>
+                          <SelectTrigger className="h-12 bg-white dark:bg-slate-900 border-slate-200">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {languages.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-slate-700 dark:text-slate-300 font-semibold">Country</Label>
+                        <Select value={formData.country} onValueChange={(v) => setFormData({ ...formData, country: v })}>
+                          <SelectTrigger className="h-12 bg-white dark:bg-slate-900 border-slate-200">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {countries.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => copyLink(type.slug)}
-                        data-testid={`copy-link-${type.booking_type_id}`}
-                      >
-                        <Copy className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(`/book/${type.slug}`, "_blank")}
-                        data-testid={`open-link-${type.booking_type_id}`}
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </Button>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label className="text-slate-700 dark:text-slate-300 font-semibold">Date Format</Label>
+                        <Select value={formData.date_format} onValueChange={(v) => setFormData({ ...formData, date_format: v })}>
+                          <SelectTrigger className="h-12 bg-white dark:bg-slate-900 border-slate-200">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {dateFormats.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-slate-700 dark:text-slate-300 font-semibold">Time Format</Label>
+                        <Select value={formData.time_format} onValueChange={(v) => setFormData({ ...formData, time_format: v })}>
+                          <SelectTrigger className="h-12 bg-white dark:bg-slate-900 border-slate-200">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {timeFormats.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-slate-700 dark:text-slate-300 font-semibold flex items-center gap-2">
+                        Time Zone
+                        <span className="text-xs font-normal text-slate-500">(Current Time: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})</span>
+                      </Label>
+                      <Select value={formData.timezone} onValueChange={(v) => setFormData({ ...formData, timezone: v })}>
+                        <SelectTrigger className="h-12 bg-white dark:bg-slate-900 border-slate-200">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[300px]">
+                          {timezones.map(tz => <SelectItem key={tz} value={tz}>{tz}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </div>
+
+                  <div className="flex justify-start pt-6">
+                    <Button
+                      type="submit"
+                      className="rounded-full bg-violet-600 hover:bg-violet-700 px-8 py-6 text-base font-semibold transition-all hover:shadow-lg hover:shadow-violet-200 dark:hover:shadow-none"
+                      disabled={saving}
+                    >
+                      {saving ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Save className="w-5 h-5 mr-2" />}
+                      Save Changes
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* Branding Tab */}
+            {activeTab === "branding" && (
+              <div className="space-y-10">
+                <section className="space-y-6">
+                  <div>
+                    <h3 className="font-semibold text-slate-900 dark:text-white mb-1">Logo</h3>
+                    <p className="text-sm text-slate-500">Your company branding will appear at the top-left corner of the scheduling page.</p>
+                  </div>
+
+                  <div className="w-full h-48 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center bg-white dark:bg-slate-900/50">
+                    <span className="text-slate-400 font-medium text-lg mb-4">No Logo</span>
+                    <Button variant="outline" className="rounded-full px-8">Upload image</Button>
+                    <p className="text-xs text-slate-400 mt-4">JPG, GIF or PNG. Max size of 5MB.</p>
+                  </div>
+                </section>
+
+                <section className="space-y-6 pt-6 border-t border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold text-slate-900 dark:text-white mb-1">Use KleverCal branding</h3>
+                      <p className="text-sm text-slate-500 max-w-md">KleverCal's branding will be displayed on your scheduling page, notifications, and confirmations.</p>
+                    </div>
+                    <Switch
+                      checked={formData.use_branding}
+                      onCheckedChange={(checked) => setFormData({ ...formData, use_branding: checked })}
+                    />
+                  </div>
+                </section>
+
+                <div className="pt-8 flex gap-4">
+                  <Button
+                    onClick={handleUpdate}
+                    className="rounded-full bg-violet-600 hover:bg-violet-700 px-8 py-6 text-base font-semibold"
+                    disabled={saving}
+                  >
+                    Save Changes
+                  </Button>
+                  <Button variant="ghost" className="rounded-full px-8 py-6 text-base font-semibold text-slate-500">Cancel</Button>
+                </div>
+              </div>
+            )}
+
+            {/* My Link Tab */}
+            {activeTab === "mylink" && (
+              <div className="space-y-8">
+                <div className="p-6 rounded-2xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 flex gap-4">
+                  <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
+                    <Link2 className="w-5 h-5 text-amber-600 dark:text-amber-500" />
+                  </div>
+                  <div className="text-sm text-amber-800 dark:text-amber-300">
+                    Changing your KleverCal URL will mean that all of your copied links will no longer work and will need to be updated.
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <Label className="text-slate-700 dark:text-slate-300 font-semibold">Your Link</Label>
+                  <div className="flex items-center gap-3">
+                    <div className="bg-slate-100 dark:bg-slate-800 px-4 h-12 rounded-xl flex items-center text-slate-500 font-medium">klevercal.com/</div>
+                    <Input
+                      value={formData.slug}
+                      onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })}
+                      className="h-12 bg-white dark:bg-slate-900 border-slate-200 flex-1"
+                      placeholder="username"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-8">
+                  <Button
+                    onClick={handleUpdate}
+                    className="rounded-full bg-violet-600 hover:bg-violet-700 px-8 py-6 text-base font-semibold"
+                    disabled={saving}
+                  >
+                    Save Changes
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </main>
       </div>
     </DashboardLayout>
   );

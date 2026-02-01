@@ -7,9 +7,7 @@ import { Switch } from "../components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Clock, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import { API_URL as API } from "../config";
 
 const DAYS = [
   { value: 0, label: "Monday" },
@@ -51,7 +49,7 @@ const AvailabilityPage = () => {
         const availObj = {};
         DAYS.forEach(day => {
           const daySlot = data.slots.find(s => s.day === day.value);
-          availObj[day.value] = daySlot 
+          availObj[day.value] = daySlot
             ? { enabled: true, start_time: daySlot.start_time, end_time: daySlot.end_time }
             : { enabled: false, start_time: "09:00", end_time: "17:00" };
         });
@@ -116,8 +114,8 @@ const AvailabilityPage = () => {
               Set your working hours for each day of the week
             </p>
           </div>
-          <Button 
-            onClick={handleSave} 
+          <Button
+            onClick={handleSave}
             disabled={saving}
             className="rounded-full bg-violet-600 hover:bg-violet-700"
             data-testid="save-availability-btn"
@@ -143,11 +141,10 @@ const AvailabilityPage = () => {
               {DAYS.map((day) => (
                 <div
                   key={day.value}
-                  className={`flex items-center gap-4 p-4 rounded-xl border ${
-                    availability[day.value]?.enabled
+                  className={`flex items-center gap-4 p-4 rounded-xl border ${availability[day.value]?.enabled
                       ? "border-violet-200 bg-violet-50/50 dark:border-violet-800 dark:bg-violet-900/10"
                       : "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/30"
-                  }`}
+                    }`}
                   data-testid={`availability-day-${day.value}`}
                 >
                   <Switch
@@ -156,7 +153,7 @@ const AvailabilityPage = () => {
                     data-testid={`day-switch-${day.value}`}
                   />
                   <div className="w-28 font-medium text-slate-900 dark:text-white">{day.label}</div>
-                  
+
                   {availability[day.value]?.enabled ? (
                     <div className="flex items-center gap-3 flex-1">
                       <Select

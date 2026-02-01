@@ -7,9 +7,7 @@ import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Calendar, Clock, Mail, User, X, Check, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import { API_URL as API } from "../config";
 
 const BookingsPage = () => {
   const { getAuthHeaders } = useAuth();
@@ -92,7 +90,7 @@ const BookingsPage = () => {
     const endTime = formatDateTime(appointment.end_time).time;
 
     return (
-      <Card 
+      <Card
         className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl"
         data-testid={`appointment-card-${appointment.appointment_id}`}
       >
@@ -140,13 +138,12 @@ const BookingsPage = () => {
           {appointment.lead_score !== null && (
             <div className="flex items-center gap-2 mb-4">
               <div className="text-sm text-slate-500">Lead Score:</div>
-              <Badge className={`${
-                appointment.lead_score >= 70 
-                  ? "bg-emerald-100 text-emerald-700" 
-                  : appointment.lead_score >= 40 
+              <Badge className={`${appointment.lead_score >= 70
+                  ? "bg-emerald-100 text-emerald-700"
+                  : appointment.lead_score >= 40
                     ? "bg-amber-100 text-amber-700"
                     : "bg-slate-100 text-slate-700"
-              }`}>
+                }`}>
                 {appointment.lead_score}/100
               </Badge>
             </div>
@@ -207,22 +204,22 @@ const BookingsPage = () => {
         ) : (
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-6 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-              <TabsTrigger 
-                value="upcoming" 
+              <TabsTrigger
+                value="upcoming"
                 className="rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900"
                 data-testid="tab-upcoming"
               >
                 Upcoming ({upcomingAppointments.length})
               </TabsTrigger>
-              <TabsTrigger 
-                value="past" 
+              <TabsTrigger
+                value="past"
                 className="rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900"
                 data-testid="tab-past"
               >
                 Past ({pastAppointments.length})
               </TabsTrigger>
-              <TabsTrigger 
-                value="cancelled" 
+              <TabsTrigger
+                value="cancelled"
                 className="rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900"
                 data-testid="tab-cancelled"
               >
@@ -235,8 +232,8 @@ const BookingsPage = () => {
                 <EmptyState message="No upcoming appointments" />
               ) : (
                 upcomingAppointments.map((appointment) => (
-                  <AppointmentCard 
-                    key={appointment.appointment_id} 
+                  <AppointmentCard
+                    key={appointment.appointment_id}
                     appointment={appointment}
                     showActions={true}
                   />

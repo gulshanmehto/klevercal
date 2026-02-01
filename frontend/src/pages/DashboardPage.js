@@ -3,15 +3,13 @@ import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { 
-  Calendar, Clock, Users, BarChart3, Plus, ArrowRight, 
+import {
+  Calendar, Clock, Users, BarChart3, Plus, ArrowRight,
   CalendarDays, CheckCircle2, TrendingUp, Sparkles,
   LayoutDashboard, Settings, LogOut, User, Zap
 } from "lucide-react";
 import { toast } from "sonner";
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import { API_URL as API } from "../config";
 
 const DashboardLayout = ({ children }) => {
   const { user, logout } = useAuth();
@@ -43,7 +41,7 @@ const DashboardLayout = ({ children }) => {
             <span className="font-bold text-xl text-slate-900 dark:text-white">KleverCal</span>
           </Link>
         </div>
-        
+
         <nav className="px-4 space-y-1">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
@@ -51,11 +49,10 @@ const DashboardLayout = ({ children }) => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${
-                  isActive
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${isActive
                     ? "bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300"
                     : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                }`}
+                  }`}
                 data-testid={`nav-${item.label.toLowerCase().replace(" ", "-")}`}
               >
                 <item.icon className="w-5 h-5" />
@@ -116,7 +113,7 @@ const DashboardPage = () => {
   const fetchDashboardData = async () => {
     try {
       const headers = { ...getAuthHeaders(), "Content-Type": "application/json" };
-      
+
       const [statsRes, typesRes, appointmentsRes] = await Promise.all([
         fetch(`${API}/dashboard/stats`, { headers, credentials: "include" }),
         fetch(`${API}/booking-types`, { headers, credentials: "include" }),
@@ -148,27 +145,27 @@ const DashboardPage = () => {
   };
 
   const statCards = [
-    { 
-      icon: CalendarDays, 
-      label: "Total Meetings", 
+    {
+      icon: CalendarDays,
+      label: "Total Meetings",
       value: stats.total_appointments,
       color: "bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400"
     },
-    { 
-      icon: Clock, 
-      label: "Upcoming", 
+    {
+      icon: Clock,
+      label: "Upcoming",
       value: stats.upcoming_appointments,
       color: "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
     },
-    { 
-      icon: TrendingUp, 
-      label: "This Week", 
+    {
+      icon: TrendingUp,
+      label: "This Week",
       value: stats.this_week_appointments,
       color: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
     },
-    { 
-      icon: BarChart3, 
-      label: "Active Types", 
+    {
+      icon: BarChart3,
+      label: "Active Types",
       value: stats.active_booking_types,
       color: "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
     }
@@ -198,8 +195,8 @@ const DashboardPage = () => {
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {statCards.map((stat, index) => (
-            <Card 
-              key={index} 
+            <Card
+              key={index}
               className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl"
               data-testid={`stat-card-${index}`}
             >
@@ -253,8 +250,8 @@ const DashboardPage = () => {
                     className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                     data-testid={`booking-type-${type.booking_type_id}`}
                   >
-                    <div 
-                      className="w-3 h-10 rounded-full" 
+                    <div
+                      className="w-3 h-10 rounded-full"
                       style={{ backgroundColor: type.color }}
                     />
                     <div className="flex-1 min-w-0">

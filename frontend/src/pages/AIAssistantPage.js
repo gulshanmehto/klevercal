@@ -6,9 +6,7 @@ import { Input } from "../components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Sparkles, Send, Calendar, Clock, Loader2, Lightbulb, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import { API_URL as API } from "../config";
 
 const AIAssistantPage = () => {
   const { getAuthHeaders } = useAuth();
@@ -133,7 +131,7 @@ const AIAssistantPage = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-slate-700 dark:text-slate-300">{result.interpretation}</p>
-              
+
               <div className="grid sm:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
@@ -162,7 +160,7 @@ const AIAssistantPage = () => {
               <div className="flex items-center gap-2">
                 <div className="text-sm text-slate-500">Confidence:</div>
                 <div className="flex-1 h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                  <div 
+                  <div
                     className="h-full bg-gradient-to-r from-violet-500 to-indigo-500 rounded-full transition-all duration-500"
                     style={{ width: `${result.confidence * 100}%` }}
                   />
@@ -184,7 +182,7 @@ const AIAssistantPage = () => {
             </CardHeader>
             <CardContent className="space-y-3">
               {history.map((item, index) => (
-                <div 
+                <div
                   key={index}
                   className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50"
                   data-testid={`history-item-${index}`}
@@ -196,7 +194,7 @@ const AIAssistantPage = () => {
                     </div>
                   </div>
                   <div className="text-sm text-slate-600 dark:text-slate-400">
-                    {item.result.suggested_date && item.result.suggested_time 
+                    {item.result.suggested_date && item.result.suggested_time
                       ? `→ ${formatDate(item.result.suggested_date)} at ${item.result.suggested_time}`
                       : item.result.interpretation
                     }

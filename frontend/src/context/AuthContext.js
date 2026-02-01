@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import axios from "axios";
+import { API_URL as API } from "../config";
 
 const AuthContext = createContext(null);
 
@@ -21,32 +20,32 @@ export const AuthProvider = ({ children }) => {
       }
 
       // Verify with server
-      const response = await fetch(`${API}/auth/me`, {
+      const response = await axios.get(`${API}/auth/me`, {
         headers: savedToken !== "session" ? { Authorization: `Bearer ${savedToken}` } : {},
-        credentials: "include",
+        withCredentials: true,
       });
 
-      if (response.ok) {
-        const userData = await response.json();
+      if (response.status === 200) {
+        const userData = response.data;
         setUser(userData);
         setToken(savedToken);
         localStorage.setItem("klevercal_user", JSON.stringify(userData));
         setLoading(false);
         return true;
-      } else {
-        // Clear invalid session
-        localStorage.removeItem("klevercal_user");
-        localStorage.removeItem("klevercal_token");
-        setUser(null);
-        setToken(null);
-        setLoading(false);
-        return false;
       }
     } catch (error) {
+      // Clear invalid session on error (e.g., 401)
       console.error("Auth check error:", error);
+      localStorage.removeItem("klevercal_user");
+      localStorage.removeItem("klevercal_token");
+      setUser(null);
+      setToken(null);
       setLoading(false);
       return false;
     }
+
+    setLoading(false);
+    return false;
   }, []);
 
   useEffect(() => {
@@ -54,51 +53,46 @@ export const AuthProvider = ({ children }) => {
   }, [checkAuth]);
 
   const login = async (email, password) => {
-    const response = await fetch(`${API}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
+    try {
+      const response = await axios.post(`${API}/auth/login`,
+        { email, password },
+        { headers: { "Content-Type": "application/json" } }
+      );
 
-    const data = await response.json();
+      const data = response.data;
 
-    if (!response.ok) {
-      throw new Error(data.detail || "Login failed");
+      setToken(data.token);
+      localStorage.setItem("klevercal_token", data.token);
+      await checkAuth();
+      return data;
+    } catch (error) {
+      const message = error.response?.data?.detail || "Login failed";
+      throw new Error(message);
     }
-
-    setUser({ user_id: data.user_id, email: data.email, name: data.name });
-    setToken(data.token);
-    localStorage.setItem("klevercal_token", data.token);
-    localStorage.setItem("klevercal_user", JSON.stringify({ user_id: data.user_id, email: data.email, name: data.name }));
-    return data;
   };
 
   const register = async (name, email, password) => {
-    const response = await fetch(`${API}/auth/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
-    });
+    try {
+      const response = await axios.post(`${API}/auth/register`,
+        { name, email, password },
+        { headers: { "Content-Type": "application/json" } }
+      );
 
-    const data = await response.json();
+      const data = response.data;
 
-    if (!response.ok) {
-      throw new Error(data.detail || "Registration failed");
+      setToken(data.token);
+      localStorage.setItem("klevercal_token", data.token);
+      await checkAuth();
+      return data;
+    } catch (error) {
+      const message = error.response?.data?.detail || "Registration failed";
+      throw new Error(message);
     }
-
-    setUser({ user_id: data.user_id, email: data.email, name: data.name });
-    setToken(data.token);
-    localStorage.setItem("klevercal_token", data.token);
-    localStorage.setItem("klevercal_user", JSON.stringify({ user_id: data.user_id, email: data.email, name: data.name }));
-    return data;
   };
 
   const logout = async () => {
     try {
-      await fetch(`${API}/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
+      await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
     } catch (e) {
       console.error("Logout error:", e);
     }

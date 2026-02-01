@@ -9,9 +9,7 @@ import { Calendar } from "../components/ui/calendar";
 import { Calendar as CalendarIcon, Clock, User, Mail, CheckCircle2, ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { format, addDays, isSameDay } from "date-fns";
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import { API_URL as API } from "../config";
 
 const PublicBookingPage = () => {
   const { slug } = useParams();
@@ -62,7 +60,7 @@ const PublicBookingPage = () => {
 
   const fetchAvailableSlots = async () => {
     if (!selectedDate || !bookingType || !host) return;
-    
+
     setLoadingSlots(true);
     try {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
@@ -175,7 +173,7 @@ const PublicBookingPage = () => {
               <p className="text-slate-600 dark:text-slate-400 mb-6">
                 Your meeting with {host.name} has been scheduled.
               </p>
-              
+
               <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 mb-6">
                 <div className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
                   {bookingType.title}
@@ -229,6 +227,12 @@ const PublicBookingPage = () => {
           <div className="grid lg:grid-cols-[320px_1fr]">
             {/* Left sidebar - Host info */}
             <div className="p-8 border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30">
+              {host.logo_url && (
+                <div className="mb-8 p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center justify-center">
+                  <img src={host.logo_url} alt="Company Logo" className="max-h-12 object-contain" />
+                </div>
+              )}
+
               <div className="flex items-center gap-4 mb-6">
                 {host.picture ? (
                   <img
@@ -237,7 +241,7 @@ const PublicBookingPage = () => {
                     className="w-16 h-16 rounded-full object-cover"
                   />
                 ) : (
-                  <div 
+                  <div
                     className="w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-semibold"
                     style={{ backgroundColor: host.brand_color }}
                   >
@@ -249,15 +253,15 @@ const PublicBookingPage = () => {
                 </div>
               </div>
 
-              <div 
-                className="h-1 w-16 rounded-full mb-6" 
+              <div
+                className="h-1 w-16 rounded-full mb-6"
                 style={{ backgroundColor: bookingType.color }}
               />
 
               <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
                 {bookingType.title}
               </h3>
-              
+
               <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 mb-4">
                 <Clock className="w-5 h-5" />
                 {bookingType.duration} minutes
@@ -267,6 +271,14 @@ const PublicBookingPage = () => {
                 <p className="text-slate-600 dark:text-slate-400 text-sm">
                   {bookingType.description}
                 </p>
+              )}
+
+              {host.welcome_message && (
+                <div className="mt-6 p-4 rounded-xl bg-violet-50/50 dark:bg-violet-900/10 border border-violet-100 dark:border-violet-800/50">
+                  <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed italic">
+                    "{host.welcome_message}"
+                  </p>
+                </div>
               )}
 
               {selectedDate && selectedSlot && (
@@ -289,7 +301,7 @@ const PublicBookingPage = () => {
                   <h3 className="font-semibold text-slate-900 dark:text-white">
                     Select a date & time
                   </h3>
-                  
+
                   <div className="grid lg:grid-cols-2 gap-8">
                     {/* Calendar */}
                     <div>
@@ -327,11 +339,10 @@ const PublicBookingPage = () => {
                                 <Button
                                   key={index}
                                   variant={selectedSlot?.start === slot.start ? "default" : "outline"}
-                                  className={`rounded-lg ${
-                                    selectedSlot?.start === slot.start
-                                      ? "bg-violet-600 hover:bg-violet-700 text-white"
-                                      : "hover:border-violet-300 hover:bg-violet-50"
-                                  }`}
+                                  className={`rounded-lg ${selectedSlot?.start === slot.start
+                                    ? "bg-violet-600 hover:bg-violet-700 text-white"
+                                    : "hover:border-violet-300 hover:bg-violet-50"
+                                    }`}
                                   onClick={() => setSelectedSlot(slot)}
                                   data-testid={`time-slot-${index}`}
                                 >
@@ -452,10 +463,16 @@ const PublicBookingPage = () => {
 
         {/* Footer */}
         <div className="text-center mt-8 text-sm text-slate-500">
-          Powered by{" "}
-          <Link to="/" className="text-violet-600 hover:text-violet-700 font-medium">
-            KleverCal
-          </Link>
+          {(host.use_branding !== false) ? (
+            <>
+              Powered by{" "}
+              <Link to="/" className="text-violet-600 hover:text-violet-700 font-medium">
+                KleverCal
+              </Link>
+            </>
+          ) : (
+            <div className="h-4" />
+          )}
         </div>
       </div>
     </div>

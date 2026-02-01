@@ -11,9 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Switch } from "../components/ui/switch";
 import { Plus, Edit2, Trash2, Copy, ExternalLink, Clock, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import { API_URL as API } from "../config";
 
 const MeetingTypesPage = () => {
   const { getAuthHeaders } = useAuth();
@@ -398,8 +396,8 @@ const MeetingTypesPage = () => {
                       </p>
                     </div>
                     <div className={`px-2 py-1 rounded-full text-xs font-medium ${type.is_active
-                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                        : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                      : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
                       }`}>
                       {type.is_active ? "Active" : "Inactive"}
                     </div>
