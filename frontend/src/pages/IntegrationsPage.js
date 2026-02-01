@@ -120,7 +120,15 @@ const IntegrationsPage = () => {
             description: "Automatically create Zoom meetings for your scheduled events.",
             icon: ExternalLink,
             color: "bg-blue-50",
-            connected: false
+            connected: user?.zoom_connected || false
+        },
+        {
+            id: "teams",
+            name: "Microsoft Teams",
+            description: "Create Microsoft Teams meetings for your events.",
+            icon: Globe,
+            color: "bg-indigo-100",
+            connected: user?.teams_connected || false
         }
     ];
 
@@ -138,16 +146,16 @@ const IntegrationsPage = () => {
                     toast.error("Failed to initiate Google connection");
                 }
             } else {
-                // Outlook or Apple
+                // Outlook, Apple, Zoom, Teams
                 const response = await fetch(`${API}/calendar/${id}/connect`, {
                     method: "POST",
                     headers: getAuthHeaders()
                 });
                 if (response.ok) {
-                    toast.success(`${id.charAt(0).toUpperCase() + id.slice(1)} Calendar connected`);
+                    toast.success(`${id.charAt(0).toUpperCase() + id.slice(1)} connected`);
                     await checkAuth();
                 } else {
-                    toast.error(`Failed to connect ${id} Calendar`);
+                    toast.error(`Failed to connect ${id}`);
                 }
             }
         } catch (error) {
@@ -166,10 +174,10 @@ const IntegrationsPage = () => {
                 headers: getAuthHeaders()
             });
             if (response.ok) {
-                toast.success(`${id.charAt(0).toUpperCase() + id.slice(1)} Calendar disconnected`);
+                toast.success(`${id.charAt(0).toUpperCase() + id.slice(1)} disconnected`);
                 await checkAuth();
             } else {
-                toast.error(`Failed to disconnect ${id} Calendar`);
+                toast.error(`Failed to disconnect ${id}`);
             }
         } catch (error) {
             toast.error(`Error disconnecting ${id} Calendar`);

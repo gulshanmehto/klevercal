@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { API_URL as API } from "../config";
 
 const MeetingTypesPage = () => {
-  const { getAuthHeaders } = useAuth();
+  const { getAuthHeaders, user } = useAuth();
   const [bookingTypes, setBookingTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -227,6 +227,32 @@ const MeetingTypesPage = () => {
                       <SelectItem value="custom">Custom Text</SelectItem>
                     </SelectContent>
                   </Select>
+
+                  {/* Connection Warnings */}
+                  {formData.location_type === "google_meet" && !user?.google_calendar_connected && (
+                    <div className="text-sm p-3 rounded-lg bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-800 mt-2">
+                      Your account is not connected to Google Calendar.{" "}
+                      <a href="/integrations" className="underline font-medium hover:text-rose-700" target="_blank" rel="noreferrer">
+                        Connect Google Calendar
+                      </a>
+                    </div>
+                  )}
+                  {formData.location_type === "zoom" && !user?.zoom_connected && (
+                    <div className="text-sm p-3 rounded-lg bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-800 mt-2">
+                      Your account is not connected to Zoom.{" "}
+                      <a href="/integrations" className="underline font-medium hover:text-rose-700" target="_blank" rel="noreferrer">
+                        Connect Zoom
+                      </a>
+                    </div>
+                  )}
+                  {formData.location_type === "teams" && !user?.teams_connected && (
+                    <div className="text-sm p-3 rounded-lg bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-800 mt-2">
+                      Your account is not connected to Microsoft Teams.{" "}
+                      <a href="/integrations" className="underline font-medium hover:text-rose-700" target="_blank" rel="noreferrer">
+                        Connect Teams
+                      </a>
+                    </div>
+                  )}
                 </div>
 
                 {formData.location_type === "custom" && (

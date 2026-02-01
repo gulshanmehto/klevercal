@@ -97,6 +97,8 @@ class UserResponse(BaseModel):
     google_calendar_connected: bool = False
     outlook_calendar_connected: bool = False
     apple_calendar_connected: bool = False
+    zoom_connected: bool = False
+    teams_connected: bool = False
     created_at: datetime
 
 class BookingTypeCreate(BaseModel):
@@ -709,6 +711,8 @@ async def get_me(user: dict = Depends(get_current_user)):
         google_calendar_connected=user.get("google_calendar_connected", False),
         outlook_calendar_connected=user.get("outlook_calendar_connected", False),
         apple_calendar_connected=user.get("apple_calendar_connected", False),
+        zoom_connected=user.get("zoom_connected", False),
+        teams_connected=user.get("teams_connected", False),
         created_at=created_at
     )
 
@@ -873,6 +877,42 @@ async def apple_calendar_disconnect(user: dict = Depends(get_current_user)):
         {"$set": {"apple_calendar_connected": False}}
     )
     return {"message": "Apple Calendar disconnected"}
+
+@api_router.post("/calendar/zoom/connect")
+async def zoom_connect(user: dict = Depends(get_current_user)):
+    """Mock Zoom connection"""
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"zoom_connected": True}}
+    )
+    return {"message": "Zoom connected (mock)"}
+
+@api_router.post("/calendar/zoom/disconnect")
+async def zoom_disconnect(user: dict = Depends(get_current_user)):
+    """Disconnect Zoom"""
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"zoom_connected": False}}
+    )
+    return {"message": "Zoom disconnected"}
+
+@api_router.post("/calendar/teams/connect")
+async def teams_connect(user: dict = Depends(get_current_user)):
+    """Mock Microsoft Teams connection"""
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"teams_connected": True}}
+    )
+    return {"message": "Microsoft Teams connected (mock)"}
+
+@api_router.post("/calendar/teams/disconnect")
+async def teams_disconnect(user: dict = Depends(get_current_user)):
+    """Disconnect Microsoft Teams"""
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"teams_connected": False}}
+    )
+    return {"message": "Microsoft Teams disconnected"}
 
 @api_router.get("/calendar/google/events")
 async def get_google_calendar_events(
