@@ -54,8 +54,7 @@ const LandingPage = () => {
       <nav className="fixed top-0 left-0 right-0 z-50 glass bg-white/70 dark:bg-slate-900/70 border-b border-slate-200/50 dark:border-slate-800/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <img src="/logo.png" alt="DeeMeet" className="w-9 h-9 object-contain" />
-            <span className="font-bold text-xl tracking-tight text-slate-900 dark:text-white">DeeMeet</span>
+            <img src="/logo.png" alt="DeeMeet" className="h-10 w-auto object-contain" />
           </Link>
           <div className="flex items-center gap-4">
             <Button
@@ -275,8 +274,7 @@ const LandingPage = () => {
       <footer className="py-12 px-6 border-t border-slate-200 dark:border-slate-800">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="DeeMeet" className="w-8 h-8 object-contain" />
-            <span className="font-semibold text-slate-900 dark:text-white">DeeMeet</span>
+            <img src="/logo.png" alt="DeeMeet" className="h-8 w-auto object-contain" />
           </div>
           <div className="text-sm text-slate-600 dark:text-slate-400">
             © 2026 DeeMeet. All rights reserved.

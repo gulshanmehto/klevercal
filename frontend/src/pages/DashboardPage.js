@@ -35,8 +35,7 @@ const DashboardLayout = ({ children }) => {
       <aside className="fixed left-0 top-0 bottom-0 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 z-40">
         <div className="p-6">
           <Link to="/" className="flex items-center gap-2">
-            <img src="/logo.png" alt="DeeMeet" className="w-9 h-9 object-contain" />
-            <span className="font-bold text-xl text-slate-900 dark:text-white">DeeMeet</span>
+            <img src="/logo.png" alt="DeeMeet" className="h-10 w-auto object-contain" />
           </Link>
         </div>
 
