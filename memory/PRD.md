@@ -106,11 +106,18 @@ Create a competitive scheduling/calendar booking product like zcal or TidyCal wi
 - [ ] Custom form questions with lead scoring
 
 ## Next Tasks
-1. Implement Google Calendar OAuth flow
-2. Add calendar sync to show real availability
-3. Set up email service for booking confirmations
+1. Register OAuth redirect URI in Google Cloud Console
+2. Add Outlook Calendar integration
+3. Implement SMS reminders via Twilio
 4. Build webhook listener for calendar updates
-5. Add meeting reminders feature
+5. Add recurring meeting types
+
+## Setup Required for Google Calendar
+To complete Google Calendar connection, add this redirect URI in Google Cloud Console:
+```
+https://smartsched-12.preview.emergentagent.com/api/calendar/google/callback
+```
+Go to: Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client IDs → Edit → Authorized redirect URIs → Add URI
 
 ## Demo Account
 - Email: demo@klevercal.com
