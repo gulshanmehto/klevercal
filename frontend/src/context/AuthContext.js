@@ -22,7 +22,6 @@ export const AuthProvider = ({ children }) => {
       // Verify with server
       const response = await axios.get(`${API}/auth/me`, {
         headers: savedToken !== "session" ? { Authorization: `Bearer ${savedToken}` } : {},
-        withCredentials: true,
       });
 
       if (response.status === 200) {
@@ -92,7 +91,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
+      await axios.post(`${API}/auth/logout`, {});
     } catch (e) {
       console.error("Logout error:", e);
     }
