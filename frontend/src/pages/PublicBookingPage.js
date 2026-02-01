@@ -10,6 +10,8 @@ import { Calendar as CalendarIcon, Clock, User, Mail, CheckCircle2, ArrowLeft, A
 import { toast } from "sonner";
 import { format, addDays, isSameDay } from "date-fns";
 import { API_URL as API } from "../config";
+import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 
 const PublicBookingPage = () => {
   const { slug } = useParams();
@@ -24,6 +26,7 @@ const PublicBookingPage = () => {
   const [formData, setFormData] = useState({
     guest_name: "",
     guest_email: "",
+    guest_phone: "",
     notes: ""
   });
   const [submitting, setSubmitting] = useState(false);
@@ -85,6 +88,11 @@ const PublicBookingPage = () => {
       return;
     }
 
+    if (formData.guest_phone && !isValidPhoneNumber(formData.guest_phone)) {
+      toast.error("Please enter a valid phone number");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const response = await fetch(`${API}/appointments`, {
@@ -95,6 +103,7 @@ const PublicBookingPage = () => {
           host_user_id: host.user_id,
           guest_name: formData.guest_name,
           guest_email: formData.guest_email,
+          guest_phone: formData.guest_phone,
           start_time: selectedSlot.start,
           notes: formData.notes,
           answers: []
@@ -423,6 +432,19 @@ const PublicBookingPage = () => {
                           className="pl-10 h-12 rounded-xl"
                           required
                           data-testid="guest-email-input"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Phone number</Label>
+                      <div className="phone-input-container">
+                        <PhoneInput
+                          placeholder="Enter phone number"
+                          value={formData.guest_phone}
+                          onChange={(value) => setFormData({ ...formData, guest_phone: value })}
+                          defaultCountry="IN"
+                          className="flex h-12 w-full rounded-xl border border-slate-200 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:placeholder:text-slate-400 dark:focus-visible:ring-slate-300"
                         />
                       </div>
                     </div>

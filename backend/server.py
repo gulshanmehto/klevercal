@@ -146,6 +146,7 @@ class AppointmentCreate(BaseModel):
     host_user_id: str
     guest_name: str
     guest_email: EmailStr
+    guest_phone: Optional[str] = None
     start_time: datetime
     notes: Optional[str] = ""
     answers: List[Dict[str, Any]] = []
@@ -157,6 +158,7 @@ class AppointmentResponse(BaseModel):
     host_user_id: str
     guest_name: str
     guest_email: str
+    guest_phone: Optional[str] = None
     start_time: datetime
     end_time: datetime
     status: str
@@ -320,7 +322,8 @@ def send_host_notification_email(
     meeting_title: str,
     start_time: datetime,
     end_time: datetime,
-    notes: str = ""
+    notes: str = "",
+    guest_phone: Optional[str] = None
 ):
     """Send notification email to host about new booking"""
     if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
@@ -332,6 +335,8 @@ def send_host_notification_email(
         
         subject = f"New Booking: {meeting_title} with {guest_name}"
         
+        phone_html = f"<p><strong>Phone:</strong> {guest_phone}</p>" if guest_phone else ""
+
         html_content = f"""
         <!DOCTYPE html>
         <html>
@@ -357,6 +362,7 @@ def send_host_notification_email(
                     <div class="meeting-card">
                         <h2 style="margin: 0 0 20px 0; color: #7c3aed;">{meeting_title}</h2>
                         <p><strong>Guest:</strong> {guest_name} ({guest_email})</p>
+                        {phone_html}
                         <p><strong>Date:</strong> {date_str}</p>
                         <p><strong>Time:</strong> {time_str}</p>
                         {f'<p><strong>Notes:</strong> {notes}</p>' if notes else ''}
@@ -1121,7 +1127,7 @@ async def create_appointment(data: AppointmentCreate):
         google_event_id = await create_google_calendar_event(
             user_id=data.host_user_id,
             summary=f"{bt['title']} with {data.guest_name}",
-            description=f"Guest: {data.guest_name}\nEmail: {data.guest_email}\nNotes: {data.notes or 'None'}",
+            description=f"Guest: {data.guest_name}\nEmail: {data.guest_email}\nPhone: {data.guest_phone or 'N/A'}\nNotes: {data.notes or 'None'}",
             start_time=data.start_time,
             end_time=end_time,
             attendee_email=data.guest_email
@@ -1133,6 +1139,7 @@ async def create_appointment(data: AppointmentCreate):
         "host_user_id": data.host_user_id,
         "guest_name": data.guest_name,
         "guest_email": data.guest_email,
+        "guest_phone": data.guest_phone,
         "start_time": data.start_time.isoformat(),
         "end_time": end_time.isoformat(),
         "status": "confirmed",
@@ -1161,6 +1168,7 @@ async def create_appointment(data: AppointmentCreate):
         host_name=host["name"],
         guest_name=data.guest_name,
         guest_email=data.guest_email,
+        guest_phone=data.guest_phone,
         meeting_title=bt["title"],
         start_time=data.start_time,
         end_time=end_time,
