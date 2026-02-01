@@ -418,18 +418,19 @@ const ProfilePage = () => {
                   </div>
                 </div>
 
-                {user?.slug && (
+
+                {formData.slug && (
                   <div className="space-y-3">
                     <Label className="text-slate-700 dark:text-slate-300 font-semibold">Your Current Link</Label>
                     <div className="flex items-center gap-3">
                       <div className="flex-1 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3">
-                        <div className="text-violet-600 dark:text-violet-400 font-medium">https://deemeet.in/{user.slug}</div>
+                        <div className="text-violet-600 dark:text-violet-400 font-medium">https://deemeet.in/{formData.slug}</div>
                       </div>
                       <Button
                         variant="outline"
                         className="rounded-xl h-12 px-6"
                         onClick={() => {
-                          navigator.clipboard.writeText(`https://deemeet.in/${user.slug}`);
+                          navigator.clipboard.writeText(`https://deemeet.in/${formData.slug}`);
                           toast.success("Link copied to clipboard!");
                         }}
                       >
