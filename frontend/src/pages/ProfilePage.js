@@ -83,13 +83,15 @@ const ProfilePage = () => {
 
       if (response.ok) {
         const data = await response.json();
-        const imageUrl = `${API}${data.url}`;
+        const imageUrl = data.url; // ImgBB returns full CDN URL
         if (type === "picture") {
           setFormData(prev => ({ ...prev, picture: imageUrl }));
         } else if (type === "logo") {
           setFormData(prev => ({ ...prev, logo_url: imageUrl }));
         }
         toast.success("Image uploaded successfully");
+        // Also update the user profile so it persists
+        await handleUpdate();
       } else {
         toast.error("Failed to upload image");
       }

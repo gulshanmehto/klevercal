@@ -1344,38 +1344,44 @@ async def update_profile(request: Request, user: dict = Depends(get_current_user
 
 # ==================== UPLOAD ROUTES ====================
 
-# Mount uploads directory to serve images
-os.makedirs("uploads", exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# ImgBB API Key (get free key from https://api.imgbb.com/*)
+IMGBB_API_KEY = os.environ.get('IMGBB_API_KEY', '')
 
 @api_router.post("/upload")
 async def upload_file(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+    """Upload image to ImgBB (free cloud storage)"""
     try:
-        file_extension = os.path.splitext(file.filename)[1]
-        unique_filename = f"{uuid.uuid4().hex}{file_extension}"
-        file_path = f"uploads/{unique_filename}"
+        if not IMGBB_API_KEY:
+            raise HTTPException(status_code=500, detail="Image upload not configured. Please set IMGBB_API_KEY environment variable.")
         
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        # Read file content
+        file_content = await file.read()
+        
+        # Convert to base64 for ImgBB API
+        import base64
+        encoded_image = base64.b64encode(file_content).decode('utf-8')
+        
+        # Upload to ImgBB
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.imgbb.com/1/upload",
+                data={
+                    "key": IMGBB_API_KEY,
+                    "image": encoded_image,
+                }
+            )
             
-        # Return the full URL
-        # For production (Vercel/Cloud Run), you'd upload to S3/GCS. 
-        # For this setup, we return a relative path or full domain path if needed.
-        # Since frontend expects a URL, we can return relative path which works if on same domain,
-        # or construct full URL if backend is separate.
-        # Assuming backend is proxied or CORS allows, let's return absolute path or relative from root.
-        
-        # NOTE: In production (Vercel), local filesystem is ephemeral.
-        # Images will disappear on redeploy.
-        # For permanent storage, users should use AWS S3, Google Cloud Storage, or Cloudinary.
-        # Since we are sticking to "simple", we warn about this or implement basic local serving 
-        # which works for a persistent VPS but not serverless.
-        # Request context can give us base URL.
-        
-        return {"url": f"/uploads/{unique_filename}"}
+            if response.status_code == 200:
+                result = response.json()
+                image_url = result['data']['url']
+                return {"url": image_url}
+            else:
+                logger.error(f"ImgBB upload failed: {response.text}")
+                raise HTTPException(status_code=500, detail="Image upload failed")
+                
     except Exception as e:
         logger.error(f"Upload failed: {e}")
-        raise HTTPException(status_code=500, detail="File upload failed")
+        raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
 
 # ==================== DASHBOARD STATS ====================
 
