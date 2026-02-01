@@ -11,10 +11,11 @@ import Confetti from "react-confetti";
 
 const OnboardingPage = () => {
     const navigate = useNavigate();
-    const { user, getAuthHeaders, checkAuth } = useAuth();
+    const { user, getAuthHeaders } = useAuth();
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [showConfetti, setShowConfetti] = useState(false);
+    const [onboardingStarted, setOnboardingStarted] = useState(true); // Track that user is in onboarding
 
     // Step 1: Username + Profile Picture
     const [username, setUsername] = useState("");
@@ -33,11 +34,11 @@ const OnboardingPage = () => {
     ]);
 
     useEffect(() => {
-        if (user?.slug) {
-            // User already completed onboarding
+        // Only redirect if user already has slug AND hasn't started onboarding in this session
+        if (user?.slug && !onboardingStarted) {
             navigate("/dashboard");
         }
-    }, [user, navigate]);
+    }, [user, navigate, onboardingStarted]);
 
     const handleProfilePictureUpload = async (e) => {
         const file = e.target.files[0];
@@ -89,7 +90,7 @@ const OnboardingPage = () => {
             });
 
             if (response.ok) {
-                await checkAuth();
+                // Don't call checkAuth() here to avoid triggering redirect
                 setStep(2);
             } else {
                 const error = await response.json();
@@ -157,8 +158,8 @@ const OnboardingPage = () => {
                             <div
                                 key={s}
                                 className={`flex-1 h-2 rounded-full mx-1 transition-all ${s <= step
-                                        ? "bg-gradient-to-r from-violet-600 to-indigo-600"
-                                        : "bg-slate-200 dark:bg-slate-800"
+                                    ? "bg-gradient-to-r from-violet-600 to-indigo-600"
+                                    : "bg-slate-200 dark:bg-slate-800"
                                     }`}
                             />
                         ))}
