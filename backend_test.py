@@ -377,6 +377,11 @@ class KleverCalAPITester:
             ("Booking Types CRUD", self.test_booking_types_crud),
             ("Availability Management", self.test_availability),
             ("Public Endpoints", self.test_public_endpoints),
+            ("Google Calendar Integration", self.test_google_calendar_integration),
+            ("Email Functionality", self.test_email_functionality),
+            ("Google Calendar Busy Times", self.test_google_calendar_busy_endpoint),
+            ("Public Slots with Calendar", self.test_public_slots_with_calendar_busy_times),
+            ("Appointment with Email", self.test_appointment_with_email_confirmation),
             ("AI Features", self.test_ai_features),
             ("Appointments", self.test_appointments)
         ]
