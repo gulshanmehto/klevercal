@@ -123,3 +123,4 @@ watchfiles
 websockets
 yarl
 zipp
+python-multipart

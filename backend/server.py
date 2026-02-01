@@ -21,6 +21,9 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request as GoogleRequest
+from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, File, UploadFile
+import shutil
 import json
 
 ROOT_DIR = Path(__file__).parent
@@ -1305,6 +1308,42 @@ async def update_profile(request: Request, user: dict = Depends(get_current_user
     
     updated = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0, "password_hash": 0, "google_tokens": 0})
     return updated
+
+
+# ==================== UPLOAD ROUTES ====================
+
+# Mount uploads directory to serve images
+os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+@api_router.post("/upload")
+async def upload_file(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+    try:
+        file_extension = os.path.splitext(file.filename)[1]
+        unique_filename = f"{uuid.uuid4().hex}{file_extension}"
+        file_path = f"uploads/{unique_filename}"
+        
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        # Return the full URL
+        # For production (Vercel/Cloud Run), you'd upload to S3/GCS. 
+        # For this setup, we return a relative path or full domain path if needed.
+        # Since frontend expects a URL, we can return relative path which works if on same domain,
+        # or construct full URL if backend is separate.
+        # Assuming backend is proxied or CORS allows, let's return absolute path or relative from root.
+        
+        # NOTE: In production (Vercel), local filesystem is ephemeral.
+        # Images will disappear on redeploy.
+        # For permanent storage, users should use AWS S3, Google Cloud Storage, or Cloudinary.
+        # Since we are sticking to "simple", we warn about this or implement basic local serving 
+        # which works for a persistent VPS but not serverless.
+        # Request context can give us base URL.
+        
+        return {"url": f"/uploads/{unique_filename}"}
+    except Exception as e:
+        logger.error(f"Upload failed: {e}")
+        raise HTTPException(status_code=500, detail="File upload failed")
 
 # ==================== DASHBOARD STATS ====================
 

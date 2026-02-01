@@ -14,7 +14,7 @@ import {
 import {
   User, Camera, Trash2, Globe, Clock, Calendar,
   MapPin, Languages, Palette, Link2, ChevronLeft,
-  Loader2, Save, ExternalLink
+  Loader2, Save, ExternalLink, ImageIcon
 } from "lucide-react";
 import { toast } from "sonner";
 import { API_URL as API } from "../config";
@@ -34,6 +34,8 @@ const ProfilePage = () => {
     timezone: "UTC",
     brand_color: "#7c3aed",
     use_branding: true,
+    picture: null,
+    logo_url: null,
     slug: ""
   });
 
@@ -52,11 +54,50 @@ const ProfilePage = () => {
         timezone: user.timezone ?? "UTC",
         brand_color: user.brand_color ?? "#7c3aed",
         use_branding: user.use_branding !== undefined ? user.use_branding : true,
+        picture: user.picture,
+        logo_url: user.logo_url,
         slug: user.slug ?? ""
       });
       setLoading(false);
     }
   }, [user]);
+
+  const handleFileUpload = async (e, type) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size limits to 5MB");
+      return;
+    }
+
+    const uploadData = new FormData();
+    uploadData.append("file", file);
+
+    try {
+      const response = await fetch(`${API}/upload`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: uploadData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const imageUrl = `${API}${data.url}`;
+        if (type === "picture") {
+          setFormData(prev => ({ ...prev, picture: imageUrl }));
+        } else if (type === "logo") {
+          setFormData(prev => ({ ...prev, logo_url: imageUrl }));
+        }
+        toast.success("Image uploaded successfully");
+      } else {
+        toast.error("Failed to upload image");
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast.error("Error uploading image");
+    }
+  };
 
   const handleUpdate = async (e) => {
     if (e) e.preventDefault();
@@ -154,14 +195,32 @@ const ProfilePage = () => {
                 <div className="flex items-center gap-6">
                   <div className="relative group">
                     <div className="w-24 h-24 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center overflow-hidden border-2 border-white dark:border-slate-800 shadow-lg">
-                      {user?.picture ? (
-                        <img src={user.picture} alt="" className="w-full h-full object-cover" />
+                      {formData.picture ? (
+                        <img src={formData.picture} alt="" className="w-full h-full object-cover" />
                       ) : (
                         <span className="text-3xl font-bold text-violet-700 dark:text-violet-300">
                           {user?.name?.charAt(0).toUpperCase()}
                         </span>
                       )}
                     </div>
+                    <label className="absolute inset-0 bg-black/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 rounded-full transition-opacity cursor-pointer">
+                      <Camera className="w-6 h-6" />
+                      <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, "picture")} />
+                    </label>
+                  </div>
+                  <div className="flex gap-3">
+                    <label>
+                      <Button variant="outline" className="rounded-full px-6 pointer-events-none">Update</Button>
+                      <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, "picture")} />
+                    </label>
+                    <Button
+                      variant="ghost"
+                      className="rounded-full text-slate-500 hover:text-rose-600"
+                      onClick={() => setFormData({ ...formData, picture: null })}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Remove
+                    </Button>
                   </div>
                 </div>
 
@@ -278,8 +337,27 @@ const ProfilePage = () => {
                     <p className="text-sm text-slate-500">Your company branding will appear at the top-left corner of the scheduling page.</p>
                   </div>
 
-                  <div className="w-full h-48 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center bg-white dark:bg-slate-900/50">
-                    <span className="text-slate-400 font-medium text-lg">No Logo</span>
+                  <div className="w-full h-48 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center bg-white dark:bg-slate-900/50 overflow-hidden relative">
+                    {formData.logo_url ? (
+                      <div className="relative w-full h-full group">
+                        <img src={formData.logo_url} alt="Brand Logo" className="w-full h-full object-contain p-4" />
+                        <div className="absolute inset-0 bg-black/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <label>
+                            <Button variant="secondary" className="pointer-events-none">Change Logo</Button>
+                            <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, "logo")} />
+                          </label>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="text-slate-400 font-medium text-lg mb-4">No Logo</span>
+                        <label>
+                          <Button variant="outline" className="rounded-full px-8 pointer-events-none">Upload image</Button>
+                          <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, "logo")} />
+                        </label>
+                        <p className="text-xs text-slate-400 mt-4">JPG, GIF or PNG. Max size of 5MB.</p>
+                      </>
+                    )}
                   </div>
                 </section>
 
