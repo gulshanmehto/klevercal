@@ -223,6 +223,146 @@ class KleverCalAPITester:
         success, _ = self.run_test("Get Appointments", "GET", "appointments", 200)
         return success
 
+    def test_google_calendar_integration(self):
+        """Test Google Calendar OAuth integration endpoints"""
+        print("\n🔗 Testing Google Calendar Integration...")
+        
+        # Test calendar connect endpoint
+        success, response = self.run_test("Google Calendar Connect", "GET", "calendar/google/connect", 200)
+        if success and 'authorization_url' in response:
+            print(f"   Authorization URL received: {response['authorization_url'][:50]}...")
+            auth_url_test = True
+        else:
+            auth_url_test = False
+            
+        # Test calendar status endpoint
+        success2, response2 = self.run_test("Google Calendar Status", "GET", "calendar/google/status", 200)
+        if success2 and 'connected' in response2:
+            print(f"   Calendar status: Connected={response2.get('connected', False)}")
+            status_test = True
+        else:
+            status_test = False
+            
+        return auth_url_test and status_test
+
+    def test_email_functionality(self):
+        """Test email sending functionality"""
+        print("\n📧 Testing Email Functionality...")
+        
+        # Test email test endpoint
+        success, response = self.run_test("Email Test", "POST", "test/email", 200)
+        if success:
+            print(f"   Email test result: {response}")
+            return True
+        return False
+
+    def test_appointment_with_email_confirmation(self):
+        """Test appointment creation with email confirmation"""
+        print("\n📅 Testing Appointment Creation with Email...")
+        
+        # First create a booking type for testing
+        booking_data = {
+            "title": "Email Test Meeting",
+            "description": "Testing email confirmation",
+            "duration": 30,
+            "color": "#7c3aed",
+            "is_active": True,
+            "buffer_before": 0,
+            "buffer_after": 15,
+            "min_notice": 60
+        }
+        
+        success, response = self.run_test("Create Booking Type for Email Test", "POST", "booking-types", 200, booking_data)
+        if not success:
+            return False
+            
+        booking_type_id = response.get('booking_type_id')
+        if not booking_type_id:
+            return False
+
+        # Create appointment (public endpoint)
+        appointment_data = {
+            "booking_type_id": booking_type_id,
+            "host_user_id": self.user_id,
+            "guest_name": "Test Guest",
+            "guest_email": "test.guest@example.com",
+            "start_time": (datetime.now() + timedelta(days=1)).isoformat(),
+            "notes": "Test appointment with email confirmation"
+        }
+        
+        success, response = self.run_test("Create Appointment with Email", "POST", "appointments", 200, appointment_data)
+        if success:
+            print(f"   Appointment created: {response.get('appointment_id', 'Unknown ID')}")
+            # Check if Google Calendar event was created
+            if response.get('google_event_id'):
+                print(f"   Google Calendar event created: {response['google_event_id']}")
+            else:
+                print("   No Google Calendar event (calendar not connected)")
+            return True
+        return False
+
+    def test_public_slots_with_calendar_busy_times(self):
+        """Test public slots endpoint considering Google Calendar busy times"""
+        print("\n🗓️ Testing Public Slots with Calendar Integration...")
+        
+        if not self.user_id:
+            return False
+            
+        # First create a booking type
+        booking_data = {
+            "title": "Slot Test Meeting",
+            "description": "Testing slot availability",
+            "duration": 30,
+            "color": "#7c3aed",
+            "is_active": True
+        }
+        
+        success, response = self.run_test("Create Booking Type for Slots", "POST", "booking-types", 200, booking_data)
+        if not success:
+            return False
+            
+        booking_type_id = response.get('booking_type_id')
+        if not booking_type_id:
+            return False
+
+        # Test getting available slots for tomorrow
+        tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+        success, response = self.run_test(
+            "Get Available Slots", 
+            "GET", 
+            f"public/slots/{self.user_id}/{booking_type_id}?date={tomorrow}", 
+            200
+        )
+        
+        if success:
+            slots = response.get('slots', [])
+            print(f"   Available slots for {tomorrow}: {len(slots)} slots")
+            if slots:
+                print(f"   First slot: {slots[0].get('display', 'Unknown time')}")
+            return True
+        return False
+
+    def test_google_calendar_busy_endpoint(self):
+        """Test Google Calendar busy times endpoint"""
+        print("\n⏰ Testing Google Calendar Busy Times...")
+        
+        # Test busy times endpoint
+        start_date = datetime.now().isoformat()
+        end_date = (datetime.now() + timedelta(days=7)).isoformat()
+        
+        success, response = self.run_test(
+            "Google Calendar Busy Times", 
+            "GET", 
+            f"calendar/google/busy?start_date={start_date}&end_date={end_date}", 
+            200
+        )
+        
+        if success:
+            busy_times = response.get('busy_times', [])
+            print(f"   Found {len(busy_times)} busy time slots")
+            return True
+        return False
+
     def run_all_tests(self):
         """Run all API tests"""
         print("🚀 Starting KleverCal API Tests")
