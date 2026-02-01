@@ -662,6 +662,14 @@ async def get_me(user: dict = Depends(get_current_user)):
         picture=user.get("picture"),
         brand_color=user.get("brand_color", "#7c3aed"),
         timezone=user.get("timezone", "UTC"),
+        welcome_message=user.get("welcome_message", ""),
+        language=user.get("language", "English"),
+        date_format=user.get("date_format", "DD/MM/YYYY"),
+        time_format=user.get("time_format", "12h"),
+        country=user.get("country", "India"),
+        logo_url=user.get("logo_url"),
+        use_branding=user.get("use_branding", True),
+        slug=user.get("slug"),
         google_calendar_connected=user.get("google_calendar_connected", False),
         created_at=created_at
     )
