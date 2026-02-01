@@ -21,14 +21,50 @@ const BookingsPage = () => {
 
   const fetchAppointments = async () => {
     try {
+      // Fetch internal appointments
       const response = await fetch(`${API}/appointments`, {
         headers: getAuthHeaders(),
-        
       });
+
+      let allAppointments = [];
       if (response.ok) {
-        const data = await response.json();
-        setAppointments(data);
+        allAppointments = await response.json();
       }
+
+      // Fetch Google Calendar events
+      try {
+        const today = new Date();
+        const thirtyDaysLater = new Date();
+        thirtyDaysLater.setDate(today.getDate() + 30);
+
+        const googleResponse = await fetch(`${API}/calendar/google/events?start_date=${today.toISOString().split('T')[0]}&end_date=${thirtyDaysLater.toISOString().split('T')[0]}`, {
+          headers: getAuthHeaders(),
+        });
+
+        if (googleResponse.ok) {
+          const googleData = await googleResponse.json();
+          const googleEvents = googleData.events.map(event => ({
+            appointment_id: `google_${event.id}`,
+            guest_name: event.summary,
+            guest_email: "Google Calendar Event", // Placeholder
+            start_time: event.start,
+            end_time: event.end,
+            status: "confirmed",
+            notes: event.description,
+            is_google_event: true,
+            lead_score: null
+          }));
+
+          allAppointments = [...allAppointments, ...googleEvents];
+        }
+      } catch (err) {
+        console.warn("Failed to fetch Google events", err);
+      }
+
+      // Sort by start time
+      allAppointments.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+      setAppointments(allAppointments);
+
     } catch (error) {
       console.error("Fetch error:", error);
       toast.error("Failed to load appointments");
@@ -42,7 +78,7 @@ const BookingsPage = () => {
       const response = await fetch(`${API}/appointments/${appointmentId}/status?status=${status}`, {
         method: "PUT",
         headers: getAuthHeaders(),
-        
+
       });
       if (response.ok) {
         toast.success(`Appointment ${status}`);
@@ -97,14 +133,23 @@ const BookingsPage = () => {
         <CardContent className="p-6">
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
-                <User className="w-6 h-6 text-violet-600 dark:text-violet-400" />
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${appointment.is_google_event
+                  ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                  : "bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400"
+                }`}>
+                {appointment.is_google_event ? <Calendar className="w-6 h-6" /> : <User className="w-6 h-6" />}
               </div>
               <div>
                 <h3 className="font-semibold text-slate-900 dark:text-white">{appointment.guest_name}</h3>
                 <div className="flex items-center gap-1 text-sm text-slate-600 dark:text-slate-400">
-                  <Mail className="w-4 h-4" />
-                  {appointment.guest_email}
+                  {appointment.is_google_event ? (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800">External</span>
+                  ) : (
+                    <>
+                      <Mail className="w-4 h-4" />
+                      {appointment.guest_email}
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -139,10 +184,10 @@ const BookingsPage = () => {
             <div className="flex items-center gap-2 mb-4">
               <div className="text-sm text-slate-500">Lead Score:</div>
               <Badge className={`${appointment.lead_score >= 70
-                  ? "bg-emerald-100 text-emerald-700"
-                  : appointment.lead_score >= 40
-                    ? "bg-amber-100 text-amber-700"
-                    : "bg-slate-100 text-slate-700"
+                ? "bg-emerald-100 text-emerald-700"
+                : appointment.lead_score >= 40
+                  ? "bg-amber-100 text-amber-700"
+                  : "bg-slate-100 text-slate-700"
                 }`}>
                 {appointment.lead_score}/100
               </Badge>
