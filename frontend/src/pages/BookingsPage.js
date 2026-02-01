@@ -23,7 +23,7 @@ const BookingsPage = () => {
     try {
       const response = await fetch(`${API}/appointments`, {
         headers: getAuthHeaders(),
-        credentials: "include"
+        
       });
       if (response.ok) {
         const data = await response.json();
@@ -42,7 +42,7 @@ const BookingsPage = () => {
       const response = await fetch(`${API}/appointments/${appointmentId}/status?status=${status}`, {
         method: "PUT",
         headers: getAuthHeaders(),
-        credentials: "include"
+        
       });
       if (response.ok) {
         toast.success(`Appointment ${status}`);

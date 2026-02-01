@@ -1,51 +1,50 @@
 # Deployment Guide for KleverCal
 
-This guide details how to deploy your KleverCal application live. We will deploy the **Backend** to **Render** (or any Python host) and the **Frontend** to **Vercel**.
+This guide details how to deploy your KleverCal application live. We will deploy the **Backend** to **Google Cloud Run** and the **Frontend** to **Vercel**.
 
 ## Prerequisites
 - A GitHub repository with this code pushed to it.
-- Accounts on [Render.com](https://render.com) and [Vercel.com](https://vercel.com).
+- A [Google Cloud Platform](https://console.cloud.google.com/) account.
+- A [Vercel](https://vercel.com) account.
 - Your MongoDB Atlas Connection String.
 
 ---
 
-## Part 1: Deploy Backend (Render)
+## Part 1: Deploy Backend (Google Cloud Run)
 
-1.  **Log in to Render** and click **New +** -> **Web Service**.
-2.  Connect your GitHub repository.
-3.  **Settings:**
-    *   **Name:** `klevercal-api` (or similar)
-    *   **Root Directory:** `backend` (Important!)
-    *   **Runtime:** Python 3
-    *   **Build Command:** `pip install -r requirements.txt`
-    *   **Start Command:** `uvicorn server:app --host 0.0.0.0 --port $PORT`
-4.  **Environment Variables:**
-    Scroll down to "Environment Variables" and add:
-    *   `MONGO_URL`: Your MongoDB connection string (e.g., `mongodb+srv://...`)
-    *   `DB_NAME`: `klevercal` (or your preferred DB name)
-    *   `JWT_SECRET`: A long random string (e.g., generate one with `openssl rand -hex 32`).
-    *   `GOOGLE_CLIENT_ID`: (If using Google Auth)
-    *   `GOOGLE_CLIENT_SECRET`: (If using Google Auth)
-    *   `GMAIL_ADDRESS`: (Optional, for emails)
-    *   `GMAIL_APP_PASSWORD`: (Optional, for emails)
-5.  Click **Create Web Service**.
-6.  **Wait for deployment.** Once live, copy the **Service URL** (e.g., `https://klevercal-api.onrender.com`).
+This is the most cost-effective option (2 million requests/month free).
 
----
-
-## Alternative Backend: Google Cloud Run (Lowest Cost)
-
-If you want a generous free tier (2 million reqs/month free), use Google Cloud Run.
-
-1.  **Install the Google Cloud CLI** (or use the Cloud Console UI).
-2.  **Enable APIs:** Search for and enable "Cloud Run API" and "Artifact Registry API".
-3.  **Deploy from Terminal:**
-    Navigate to the `backend` folder and run:
+### Option A: Via Terminal (Recommended)
+1.  **Install the Google Cloud CLI** (or use the Cloud Shell in the browser console).
+2.  **Login:** Run `gcloud auth login`.
+3.  **Deploy:** Navigate to your project root in the terminal and run:
     ```bash
+    cd backend
     gcloud run deploy klevercal-api --source . --region us-central1 --allow-unauthenticated
     ```
-4.  **Set Environment Variables:**
-    Go to the Google Cloud Console -> Cloud Run -> klevercal-api -> **Edit & Deploy New Revision** -> **Variables**. Add your `MONGO_URL`, `JWT_SECRET`, etc., here.
+    *   *Note: If asked to enable APIs (Cloud Run, Artifact Registry), say yes.*
+
+### Option B: Via Google Cloud Console UI
+1.  Go to **[Google Cloud Console](https://console.cloud.google.com/)** -> **Cloud Run**.
+2.  Click **Create Service**.
+3.  Select **"Continuously deploy new revisions from a source repository"**.
+4.  Connect your GitHub repo and select the `backend` folder as the source location.
+5.  **Authentication:** Select "Allow unauthenticated invocations".
+6.  Click **Create**.
+
+### Configuration (Environment Variables)
+Once created (via Terminal or UI), you MUST set your environment variables:
+1.  Go to **Cloud Run** -> Select your service (`klevercal-api`).
+2.  Click **Edit & Deploy New Revision**.
+3.  Go to the **Variables & Secrets** tab.
+4.  Add the following variables:
+    *   `MONGO_URL`: Your MongoDB connection string.
+    *   `DB_NAME`: `klevercal`
+    *   `JWT_SECRET`: (Your random secret)
+    *   *(Optional)* `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`.
+5.  Click **Deploy**.
+
+**Copy your Backend URL:** It will look like `https://klevercal-api-xyz-uc.a.run.app`.
 
 ---
 
@@ -58,7 +57,7 @@ If you want a generous free tier (2 million reqs/month free), use Google Cloud R
     *   **Root Directory:** Click "Edit" and select `frontend`.
 4.  **Environment Variables:**
     *   Name: `REACT_APP_BACKEND_URL`
-    *   Value: Your Render Backend URL (e.g., `https://klevercal-api.onrender.com`). **Do not add a trailing slash `/`**.
+    *   Value: Your Google Cloud Run URL (e.g., `https://klevercal-api-xyz-uc.a.run.app`). **Do not add a trailing slash `/`**.
 5.  Click **Deploy**.
 
 ---
@@ -66,9 +65,6 @@ If you want a generous free tier (2 million reqs/month free), use Google Cloud R
 ## Part 3: Final Integration
 
 1.  Once the Frontend is deployed, visit the Vercel URL.
-2.  Try logging in.
-3.  If you have issues, check the `Console` in your browser's Developer Tools (F12) for errors.
-
-### Troubleshooting
-*   **CORS Errors:** Ensure your backend `server.py` has `allow_origins=["*"]` (which we have already configured).
-*   **Database:** Ensure your MongoDB Atlas Network Access whitelist allows access from anywhere (`0.0.0.0/0`) or specifically from Render's IPs.
+2.  **Troubleshooting:**
+    *   **CORS Errors:** If you see network errors, check your browser console. Ensure your Backend environment variables on Google Cloud are correctly saved.
+    *   **MongoDB Network Access:** Ensure your MongoDB Atlas Whitelist allows access from anywhere (`0.0.0.0/0`) since Google Cloud IPs change dynamically.

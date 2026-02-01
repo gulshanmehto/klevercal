@@ -41,7 +41,7 @@ const AvailabilityPage = () => {
     try {
       const response = await fetch(`${API}/availability`, {
         headers: getAuthHeaders(),
-        credentials: "include"
+        
       });
       if (response.ok) {
         const data = await response.json();
@@ -81,7 +81,7 @@ const AvailabilityPage = () => {
       const response = await fetch(`${API}/availability`, {
         method: "PUT",
         headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
-        credentials: "include",
+        ,
         body: JSON.stringify({ slots })
       });
 

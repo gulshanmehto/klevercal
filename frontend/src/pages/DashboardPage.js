@@ -115,9 +115,9 @@ const DashboardPage = () => {
       const headers = { ...getAuthHeaders(), "Content-Type": "application/json" };
 
       const [statsRes, typesRes, appointmentsRes] = await Promise.all([
-        fetch(`${API}/dashboard/stats`, { headers, credentials: "include" }),
-        fetch(`${API}/booking-types`, { headers, credentials: "include" }),
-        fetch(`${API}/appointments?status=confirmed`, { headers, credentials: "include" })
+        fetch(`${API}/dashboard/stats`, { headers,  }),
+        fetch(`${API}/booking-types`, { headers,  }),
+        fetch(`${API}/appointments?status=confirmed`, { headers,  })
       ]);
 
       if (statsRes.ok) {

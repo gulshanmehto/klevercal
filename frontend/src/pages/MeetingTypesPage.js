@@ -41,7 +41,6 @@ const MeetingTypesPage = () => {
     try {
       const response = await fetch(`${API}/booking-types`, {
         headers: getAuthHeaders(),
-        credentials: "include"
       });
       if (response.ok) {
         const data = await response.json();
@@ -67,7 +66,6 @@ const MeetingTypesPage = () => {
       const response = await fetch(url, {
         method: editingType ? "PUT" : "POST",
         headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify(formData)
       });
 
@@ -95,7 +93,6 @@ const MeetingTypesPage = () => {
       const response = await fetch(`${API}/booking-types/${id}`, {
         method: "DELETE",
         headers: getAuthHeaders(),
-        credentials: "include"
       });
 
       if (response.ok) {
