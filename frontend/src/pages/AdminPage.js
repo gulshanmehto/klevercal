@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 import { API_URL as API } from "../config";
 import { toast } from "sonner";
-import { Users, TrendingUp, Calendar, DollarSign, Globe, Clock, Search, Plus, Trash2, Crown, BarChart3, Activity } from "lucide-react";
+import { Users, TrendingUp, Calendar, DollarSign, Globe, Clock, Search, Plus, Trash2, Crown, BarChart3, Activity, LogOut, User } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 
 const AdminPage = () => {
+    const navigate = useNavigate();
     const { getAuthHeaders } = useAuth();
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState("dashboard");
@@ -149,6 +151,13 @@ const AdminPage = () => {
         }
     };
 
+    const handleLogout = () => {
+        localStorage.removeItem("klevercal_token");
+        localStorage.removeItem("klevercal_user");
+        toast.success("Logged out successfully");
+        navigate("/administrator-login");
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -160,12 +169,34 @@ const AdminPage = () => {
         );
     }
 
+    const userEmail = JSON.parse(localStorage.getItem("klevercal_user") || "{}").email || "Admin";
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-900 p-6">
             <div className="max-w-7xl mx-auto">
-                <div className="mb-8">
-                    <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-2">🚀 Admin Panel</h1>
-                    <p className="text-slate-600 dark:text-slate-400">Manage your DeeMeet platform</p>
+                <div className="mb-8 flex items-center justify-between">
+                    <div>
+                        <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-2">🚀 Admin Panel</h1>
+                        <p className="text-slate-600 dark:text-slate-400">Manage your DeeMeet platform</p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3 bg-white dark:bg-slate-800 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center">
+                                <User className="w-6 h-6 text-white" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-semibold text-slate-900 dark:text-white">{userEmail}</p>
+                                <p className="text-xs text-slate-500">Administrator</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={handleLogout}
+                            className="flex items-center gap-2 px-4 py-3 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 rounded-xl font-semibold transition-all border border-red-200 dark:border-red-800"
+                        >
+                            <LogOut className="w-5 h-5" />
+                            <span>Logout</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div className="flex gap-2 mb-6 overflow-x-auto pb-2">

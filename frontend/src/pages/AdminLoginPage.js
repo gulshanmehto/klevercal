@@ -34,18 +34,19 @@ const AdminLoginPage = () => {
                 };
 
                 // Store token and user in localStorage
-                localStorage.setItem("token", data.token);
-                localStorage.setItem("user", JSON.stringify(user));
+                localStorage.setItem("klevercal_token", data.token);
+                localStorage.setItem("klevercal_user", JSON.stringify(user));
 
                 // Check if user is admin
                 const adminEmails = ["gulshanmehto15@gmail.com", "admin@deemeet.com", "gulshan@klevermarketing.in"];
                 if (adminEmails.includes(user.email)) {
                     toast.success("Admin login successful!");
-                    navigate("/admin", { state: { user } });
+                    // Force reload to ensure AuthContext picks up the new token
+                    window.location.href = "/admin";
                 } else {
                     toast.error("Access denied. Admin privileges required.");
-                    localStorage.removeItem("token");
-                    localStorage.removeItem("user");
+                    localStorage.removeItem("klevercal_token");
+                    localStorage.removeItem("klevercal_user");
                 }
             } else {
                 const error = await response.json();
