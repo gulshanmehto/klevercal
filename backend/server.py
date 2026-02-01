@@ -641,69 +641,7 @@ async def get_me(user: dict = Depends(get_current_user)):
         created_at=created_at
     )
 
-@api_router.post("/auth/session")
-async def process_session(request: Request, response: Response):
-    body = await request.json()
-    session_id = body.get("session_id")
-    
-    if not session_id:
-        raise HTTPException(status_code=400, detail="Session ID required")
-    
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
-            headers={"X-Session-ID": session_id}
-        )
-        if resp.status_code != 200:
-            raise HTTPException(status_code=401, detail="Invalid session")
-        auth_data = resp.json()
-    
-    existing_user = await db.users.find_one({"email": auth_data["email"]}, {"_id": 0})
-    
-    if existing_user:
-        user_id = existing_user["user_id"]
-        await db.users.update_one(
-            {"user_id": user_id},
-            {"$set": {"name": auth_data["name"], "picture": auth_data.get("picture")}}
-        )
-    else:
-        user_id = f"user_{uuid.uuid4().hex[:12]}"
-        await db.users.insert_one({
-            "user_id": user_id,
-            "email": auth_data["email"],
-            "name": auth_data["name"],
-            "picture": auth_data.get("picture"),
-            "password_hash": "",
-            "brand_color": "#7c3aed",
-            "timezone": "UTC",
-            "google_calendar_connected": False,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        })
-        
-        default_slots = [{"day": day, "start_time": "09:00", "end_time": "17:00"} for day in range(5)]
-        await db.availability.insert_one({
-            "availability_id": f"avail_{uuid.uuid4().hex[:12]}",
-            "user_id": user_id,
-            "slots": default_slots,
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        })
-    
-    session_token = auth_data.get("session_token", f"session_{uuid.uuid4().hex}")
-    await db.user_sessions.insert_one({
-        "session_id": f"sess_{uuid.uuid4().hex[:12]}",
-        "user_id": user_id,
-        "session_token": session_token,
-        "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
-        "created_at": datetime.now(timezone.utc).isoformat()
-    })
-    
-    response.set_cookie(
-        key="session_token", value=session_token, httponly=True,
-        secure=True, samesite="none", max_age=7*24*60*60, path="/"
-    )
-    
-    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-    return {"user_id": user["user_id"], "email": user["email"], "name": user["name"], "picture": user.get("picture")}
+
 
 @api_router.post("/auth/logout")
 async def logout(request: Request, response: Response):

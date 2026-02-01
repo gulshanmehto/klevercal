@@ -62,10 +62,10 @@ const MeetingTypesPage = () => {
     setSaving(true);
 
     try {
-      const url = editingType 
+      const url = editingType
         ? `${API}/booking-types/${editingType.booking_type_id}`
         : `${API}/booking-types`;
-      
+
       const response = await fetch(url, {
         method: editingType ? "PUT" : "POST",
         headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
@@ -73,14 +73,15 @@ const MeetingTypesPage = () => {
         body: JSON.stringify(formData)
       });
 
+      const data = await response.json();
+
       if (response.ok) {
         toast.success(editingType ? "Meeting type updated!" : "Meeting type created!");
         setDialogOpen(false);
         resetForm();
         fetchBookingTypes();
       } else {
-        const error = await response.json();
-        toast.error(error.detail || "Failed to save");
+        toast.error(data.detail || "Failed to save");
       }
     } catch (error) {
       toast.error("An error occurred");
@@ -396,15 +397,14 @@ const MeetingTypesPage = () => {
                         {type.duration} minutes
                       </p>
                     </div>
-                    <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      type.is_active 
+                    <div className={`px-2 py-1 rounded-full text-xs font-medium ${type.is_active
                         ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
                         : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
-                    }`}>
+                      }`}>
                       {type.is_active ? "Active" : "Inactive"}
                     </div>
                   </div>
-                  
+
                   {type.description && (
                     <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 line-clamp-2">
                       {type.description}

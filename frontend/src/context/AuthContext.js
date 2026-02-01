@@ -60,12 +60,12 @@ export const AuthProvider = ({ children }) => {
       body: JSON.stringify({ email, password }),
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Login failed");
+      throw new Error(data.detail || "Login failed");
     }
 
-    const data = await response.json();
     setUser({ user_id: data.user_id, email: data.email, name: data.name });
     setToken(data.token);
     localStorage.setItem("klevercal_token", data.token);
@@ -80,12 +80,12 @@ export const AuthProvider = ({ children }) => {
       body: JSON.stringify({ name, email, password }),
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || "Registration failed");
+      throw new Error(data.detail || "Registration failed");
     }
 
-    const data = await response.json();
     setUser({ user_id: data.user_id, email: data.email, name: data.name });
     setToken(data.token);
     localStorage.setItem("klevercal_token", data.token);
@@ -108,11 +108,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("klevercal_user");
   };
 
-  // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-  const loginWithGoogle = () => {
-    const redirectUrl = window.location.origin + "/dashboard";
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
-  };
+
 
   const getAuthHeaders = () => {
     if (!token || token === "session") return {};
@@ -128,7 +124,6 @@ export const AuthProvider = ({ children }) => {
         login,
         register,
         logout,
-        loginWithGoogle,
         checkAuth,
         getAuthHeaders,
       }}
