@@ -52,6 +52,21 @@ Create a competitive scheduling/calendar booking product like zcal or TidyCal wi
 - `/api/public/*` - Public booking endpoints
 - `/api/dashboard/stats` - Dashboard statistics
 - `/api/profile` - User profile management
+- `/api/calendar/google/*` - Google Calendar OAuth 2-way sync
+- `/api/test/email` - Email service testing
+
+### Google Calendar Integration (Feb 2026)
+- OAuth 2.0 flow for calendar connection
+- 2-way sync: reads busy times, writes booked meetings
+- Automatic event creation with attendee invites
+- Event deletion on appointment cancellation
+- Busy time detection for availability slots
+
+### Email Notifications (Feb 2026)
+- Gmail SMTP integration
+- Beautiful HTML booking confirmation emails to guests
+- Host notification emails for new bookings
+- Includes meeting details, date, time, notes
 
 ### Frontend Pages
 - Landing page with hero, features, testimonials, CTA
