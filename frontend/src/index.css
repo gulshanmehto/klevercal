@@ -6,7 +6,7 @@
 
 body {
     margin: 0;
-    font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Open Sauce Two', -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
@@ -17,7 +17,7 @@ h3,
 h4,
 h5,
 h6 {
-    font-family: 'Open Sans', sans-serif;
+    font-family: 'Open Sauce Two', sans-serif;
 }
 
 code {
