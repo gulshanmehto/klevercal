@@ -21,6 +21,7 @@ import AdminLoginPage from "./pages/AdminLoginPage";
 import IntegrationsPage from "./pages/IntegrationsPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import TermsPage from "./pages/TermsPage";
+import GoogleCallbackPage from "./pages/GoogleCallbackPage";
 
 // Auth context
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -141,6 +142,7 @@ const AppRouter = () => {
       <Route path="/book/:slug" element={<PublicBookingPage />} />
       <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
       <Route path="/terms" element={<TermsPage />} />
+      <Route path="/api/calendar/google/callback" element={<GoogleCallbackPage />} />
       {/* Public Profile Route - Placed last to avoid conflicts */}
       <Route path="/:slug" element={<PublicProfilePage />} />
     </Routes>
