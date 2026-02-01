@@ -776,8 +776,11 @@ async def google_calendar_callback(code: str, state: str, request: Request):
         logger.info(f"Google Calendar connected for user {user_id}")
         
         # Redirect back to profile page
-        origin = redirect_uri.replace("/api/calendar/google/callback", "")
-        return RedirectResponse(url=f"{origin}/profile?calendar_connected=true")
+        return {
+            "status": "success",
+            "message": "Calendar connected successfully",
+            "redirect_url": f"{origin}/profile?calendar_connected=true"
+        }
         
     except Exception as e:
         logger.error(f"Google Calendar OAuth error: {e}")

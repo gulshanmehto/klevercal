@@ -31,10 +31,10 @@ const GoogleCallbackPage = () => {
 
                 // Check if response is a redirect (which it is from the backend)
                 if (response.redirected) {
-                     window.location.href = response.url;
-                     return;
+                    window.location.href = response.url;
+                    return;
                 }
-                
+
                 // If not redirected automatically by fetch (unlikely for 307/302), handle JSON
                 if (!response.ok) {
                     throw new Error('Failed to complete connection');
@@ -42,8 +42,10 @@ const GoogleCallbackPage = () => {
 
                 // If the backend returns JSON instead of redirecting
                 const data = await response.json();
-                toast.success("Calendar connected successfully!");
-                navigate('/integrations');
+
+                // Refresh auth state to update UI
+                await window.location.reload(); // Simple way to ensure auth state is fresh
+                // navigate('/integrations'); // We'll reload instead to be safe
 
             } catch (error) {
                 console.error('Callback error:', error);
