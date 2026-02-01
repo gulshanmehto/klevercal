@@ -131,8 +131,8 @@ const LandingPage = () => {
             <div className="relative">
               <div className="absolute -inset-4 bg-gradient-to-r from-violet-500/20 to-indigo-500/20 rounded-3xl blur-2xl" />
               <img
-                src="https://images.unsplash.com/photo-1610641563856-4ec0223d7084?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAxODF8MHwxfHNlYXJjaHwxfHxtaW5pbWFsaXN0JTIwb2ZmaWNlJTIwZGVzayUyMHRlY2hub2xvZ3l8ZW58MHx8fHwxNzY5OTQzMjQxfDA&ixlib=rb-4.1.0&q=85&w=800"
-                alt="Modern workspace"
+                src="/feature-image.png"
+                alt="DeeMeet Platform"
                 className="relative rounded-2xl shadow-2xl w-full object-cover"
               />
             </div>
