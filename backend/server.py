@@ -623,7 +623,6 @@ async def register(user_data: UserCreate):
         "time_format": "12h",
         "country": "India",
         "use_branding": True,
-        "slug": user_data.name.lower().replace(" ", "-") + "-" + uuid.uuid4().hex[:4],
         "google_calendar_connected": False,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
