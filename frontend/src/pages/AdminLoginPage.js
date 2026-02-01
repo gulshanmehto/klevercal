@@ -25,15 +25,23 @@ const AdminLoginPage = () => {
             if (response.ok) {
                 const data = await response.json();
 
+                // Backend returns: {token, user_id, email, name}
+                // Construct user object from response
+                const user = {
+                    user_id: data.user_id,
+                    email: data.email,
+                    name: data.name
+                };
+
                 // Store token and user in localStorage
-                localStorage.setItem("token", data.access_token);
-                localStorage.setItem("user", JSON.stringify(data.user));
+                localStorage.setItem("token", data.token);
+                localStorage.setItem("user", JSON.stringify(user));
 
                 // Check if user is admin
                 const adminEmails = ["gulshanmehto15@gmail.com", "admin@deemeet.com", "gulshan@klevermarketing.in"];
-                if (adminEmails.includes(data.user.email)) {
+                if (adminEmails.includes(user.email)) {
                     toast.success("Admin login successful!");
-                    navigate("/admin", { state: { user: data.user } });
+                    navigate("/admin", { state: { user } });
                 } else {
                     toast.error("Access denied. Admin privileges required.");
                     localStorage.removeItem("token");
