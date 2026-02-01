@@ -54,7 +54,7 @@ GMAIL_APP_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD', '')
 # Gemini Settings
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 
-app = FastAPI(title="KleverCal API")
+app = FastAPI(title="DeeMeet API")
 api_router = APIRouter(prefix="/api")
 
 # Configure logging
@@ -260,7 +260,7 @@ def send_booking_confirmation_email(
                     </p>
                 </div>
                 <div class="footer">
-                    <p>Powered by KleverCal - Smart Scheduling</p>
+                    <p>Powered by DeeMeet - Smart Scheduling</p>
                 </div>
             </div>
         </body>
@@ -285,13 +285,13 @@ A calendar invite will be sent separately.
 
 Need to reschedule or cancel? Reply to this email.
 
-Powered by KleverCal
+Powered by DeeMeet
         """
         
         # Create message
         msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
-        msg['From'] = f"KleverCal <{GMAIL_ADDRESS}>"
+        msg['From'] = f"DeeMeet <{GMAIL_ADDRESS}>"
         msg['To'] = to_email
         
         msg.attach(MIMEText(text_content, 'plain'))
@@ -360,7 +360,7 @@ def send_host_notification_email(
                     </div>
                 </div>
                 <div class="footer">
-                    <p>Powered by KleverCal</p>
+                    <p>Powered by DeeMeet</p>
                 </div>
             </div>
         </body>
@@ -369,7 +369,7 @@ def send_host_notification_email(
         
         msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
-        msg['From'] = f"KleverCal <{GMAIL_ADDRESS}>"
+        msg['From'] = f"DeeMeet <{GMAIL_ADDRESS}>"
         msg['To'] = host_email
         msg.attach(MIMEText(html_content, 'html'))
         
@@ -1003,7 +1003,7 @@ async def get_available_slots(user_id: str, booking_type_id: str, date: str):
     if not day_slots:
         return {"slots": []}
     
-    # Get existing KleverCal appointments
+    # Get existing DeeMeet appointments
     start_of_day = datetime.combine(target_date, datetime.min.time()).replace(tzinfo=timezone.utc)
     end_of_day = datetime.combine(target_date, datetime.max.time()).replace(tzinfo=timezone.utc)
     
@@ -1356,7 +1356,7 @@ async def test_email(user: dict = Depends(get_current_user)):
 
 @api_router.get("/")
 async def root():
-    return {"message": "KleverCal API", "version": "1.1.0", "features": ["calendar_sync", "email_notifications"]}
+    return {"message": "DeeMeet API", "version": "1.1.0", "features": ["calendar_sync", "email_notifications"]}
 
 # Include router
 app.include_router(api_router)

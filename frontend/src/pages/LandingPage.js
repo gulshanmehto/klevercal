@@ -38,7 +38,7 @@ const LandingPage = () => {
       name: "Sarah Chen",
       role: "Sales Director",
       image: "https://images.unsplash.com/photo-1769636929388-99eff95d3bf1?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NjZ8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBoZWFkc2hvdCUyMHBvcnRyYWl0fGVufDB8fHx8MTc2OTg4MzM2MHww&ixlib=rb-4.1.0&q=85&w=100&h=100&fit=crop",
-      quote: "KleverCal cut my scheduling admin by 80%. The AI assistant is a game-changer."
+      quote: "DeeMeet cut my scheduling admin by 80%. The AI assistant is a game-changer."
     },
     {
       name: "Marcus Johnson",
@@ -57,7 +57,7 @@ const LandingPage = () => {
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center">
               <Calendar className="w-5 h-5 text-white" />
             </div>
-            <span className="font-bold text-xl tracking-tight text-slate-900 dark:text-white">KleverCal</span>
+            <span className="font-bold text-xl tracking-tight text-slate-900 dark:text-white">DeeMeet</span>
           </Link>
           <div className="flex items-center gap-4">
             <Button
@@ -127,7 +127,7 @@ const LandingPage = () => {
                   ))}
                 </div>
                 <div className="text-sm text-slate-600 dark:text-slate-400">
-                  <span className="font-semibold text-slate-900 dark:text-white">2,500+</span> professionals trust KleverCal
+                  <span className="font-semibold text-slate-900 dark:text-white">2,500+</span> professionals trust DeeMeet
                 </div>
               </div>
             </div>
@@ -248,7 +248,7 @@ const LandingPage = () => {
               Ready to schedule smarter?
             </h2>
             <p className="text-violet-100 text-lg mb-8 max-w-xl mx-auto">
-              Join thousands of professionals who save hours every week with KleverCal.
+              Join thousands of professionals who save hours every week with DeeMeet.
             </p>
             <Button
               onClick={() => navigate("/signup")}
@@ -280,10 +280,10 @@ const LandingPage = () => {
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center">
               <Calendar className="w-4 h-4 text-white" />
             </div>
-            <span className="font-semibold text-slate-900 dark:text-white">KleverCal</span>
+            <span className="font-semibold text-slate-900 dark:text-white">DeeMeet</span>
           </div>
           <div className="text-sm text-slate-600 dark:text-slate-400">
-            © 2026 KleverCal. All rights reserved.
+            © 2026 DeeMeet. All rights reserved.
           </div>
         </div>
       </footer>

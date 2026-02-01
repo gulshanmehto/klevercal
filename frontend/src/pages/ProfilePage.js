@@ -303,8 +303,8 @@ const ProfilePage = () => {
                 <section className="space-y-6 pt-6 border-t border-slate-200 dark:border-slate-800">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-semibold text-slate-900 dark:text-white mb-1">Use KleverCal branding</h3>
-                      <p className="text-sm text-slate-500 max-w-md">KleverCal's branding will be displayed on your scheduling page, notifications, and confirmations.</p>
+                      <h3 className="font-semibold text-slate-900 dark:text-white mb-1">Use DeeMeet branding</h3>
+                      <p className="text-sm text-slate-500 max-w-md">DeeMeet's branding will be displayed on your scheduling page, notifications, and confirmations.</p>
                     </div>
                     <Switch
                       checked={formData.use_branding}
@@ -334,7 +334,7 @@ const ProfilePage = () => {
                     <Link2 className="w-5 h-5 text-amber-600 dark:text-amber-500" />
                   </div>
                   <div className="text-sm text-amber-800 dark:text-amber-300">
-                    Changing your KleverCal URL will mean that all of your copied links will no longer work and will need to be updated.
+                    Changing your DeeMeet URL will mean that all of your copied links will no longer work and will need to be updated.
                   </div>
                 </div>
 

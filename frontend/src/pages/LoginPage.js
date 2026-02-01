@@ -43,7 +43,7 @@ const LoginPage = () => {
           <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
             <Calendar className="w-6 h-6 text-white" />
           </div>
-          <span className="font-bold text-2xl text-white">KleverCal</span>
+          <span className="font-bold text-2xl text-white">DeeMeet</span>
         </Link>
         <div className="space-y-6">
           <h1 className="text-4xl font-bold text-white leading-tight">
@@ -54,7 +54,7 @@ const LoginPage = () => {
           </p>
         </div>
         <div className="text-violet-200 text-sm">
-          © 2026 KleverCal. All rights reserved.
+          © 2026 DeeMeet. All rights reserved.
         </div>
       </div>
 
@@ -66,7 +66,7 @@ const LoginPage = () => {
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center">
                 <Calendar className="w-5 h-5 text-white" />
               </div>
-              <span className="font-bold text-xl text-slate-900 dark:text-white">KleverCal</span>
+              <span className="font-bold text-xl text-slate-900 dark:text-white">DeeMeet</span>
             </div>
             <CardTitle className="text-2xl font-bold text-slate-900 dark:text-white">Sign in</CardTitle>
             <CardDescription className="text-slate-600 dark:text-slate-400">
