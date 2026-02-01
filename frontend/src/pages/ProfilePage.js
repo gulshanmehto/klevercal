@@ -402,7 +402,7 @@ const ProfilePage = () => {
                 <div className="space-y-4">
                   <Label className="text-slate-700 dark:text-slate-300 font-semibold">Your Link</Label>
                   <div className="flex items-center gap-3">
-                    <div className="bg-slate-100 dark:bg-slate-800 px-4 h-12 rounded-xl flex items-center text-slate-500 font-medium">klevercal.com/</div>
+                    <div className="bg-slate-100 dark:bg-slate-800 px-4 h-12 rounded-xl flex items-center text-slate-500 font-medium">deemeet.in/</div>
                     <Input
                       value={formData.slug}
                       onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })}
