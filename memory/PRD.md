@@ -88,15 +88,15 @@ Create a competitive scheduling/calendar booking product like zcal or TidyCal wi
 ## Prioritized Backlog
 
 ### P0 (Critical - Next Sprint)
-- [ ] Google Calendar OAuth integration (read/write events)
-- [ ] Real-time busy/free detection from connected calendars
-- [ ] Email confirmation for bookings
+- [x] Google Calendar OAuth integration (read/write events) ✅
+- [x] Real-time busy/free detection from connected calendars ✅
+- [x] Email confirmation for bookings ✅
 
 ### P1 (Important)
 - [ ] Outlook Calendar integration
 - [ ] Apple Calendar integration
 - [ ] Recurring meeting types
-- [ ] Meeting reminders (email/SMS)
+- [ ] Meeting reminders (SMS via Twilio)
 
 ### P2 (Nice to Have)
 - [ ] White-label custom domains (CNAME)
