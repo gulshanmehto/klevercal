@@ -30,7 +30,7 @@ const AdminLoginPage = () => {
                 localStorage.setItem("user", JSON.stringify(data.user));
 
                 // Check if user is admin
-                const adminEmails = ["gulshanmehto15@gmail.com", "admin@deemeet.com"];
+                const adminEmails = ["gulshanmehto15@gmail.com", "admin@deemeet.com", "gulshan@klevermarketing.in"];
                 if (adminEmails.includes(data.user.email)) {
                     toast.success("Admin login successful!");
                     navigate("/admin", { state: { user: data.user } });
