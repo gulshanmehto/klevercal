@@ -19,6 +19,8 @@ import AIAssistantPage from "./pages/AIAssistantPage";
 import AdminPage from "./pages/AdminPage";
 import AdminLoginPage from "./pages/AdminLoginPage";
 import IntegrationsPage from "./pages/IntegrationsPage";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import TermsPage from "./pages/TermsPage";
 
 // Auth context
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -137,6 +139,8 @@ const AppRouter = () => {
       <Route path="/administrator-login" element={<AdminLoginPage />} />
       <Route path="/admin" element={<AdminPage />} />
       <Route path="/book/:slug" element={<PublicBookingPage />} />
+      <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+      <Route path="/terms" element={<TermsPage />} />
       {/* Public Profile Route - Placed last to avoid conflicts */}
       <Route path="/:slug" element={<PublicProfilePage />} />
     </Routes>

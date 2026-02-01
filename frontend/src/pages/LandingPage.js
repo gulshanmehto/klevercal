@@ -275,8 +275,10 @@ const LandingPage = () => {
           <div className="flex items-center gap-2">
             <img src="/logo-dark.png" alt="DeeMeet" className="h-8 w-auto object-contain" />
           </div>
-          <div className="text-sm text-slate-600 dark:text-slate-400">
-            © 2026 DeeMeet. All rights reserved.
+          <div className="flex items-center gap-6 text-sm text-slate-600 dark:text-slate-400">
+            <Link to="/privacy-policy" className="hover:text-violet-600 transition-colors">Privacy Policy</Link>
+            <Link to="/terms" className="hover:text-violet-600 transition-colors">Terms of Service</Link>
+            <span>© 2026 DeeMeet. All rights reserved.</span>
           </div>
         </div>
       </footer>
