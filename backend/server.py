@@ -47,8 +47,18 @@ GOOGLE_SCOPES = [
     'https://www.googleapis.com/auth/calendar.events',
     'https://www.googleapis.com/auth/userinfo.email',
     'https://www.googleapis.com/auth/userinfo.profile',
+    'https://www.googleapis.com/auth/userinfo.profile',
     'openid'
 ]
+
+# Zoom OAuth Settings
+ZOOM_CLIENT_ID = os.environ.get('ZOOM_CLIENT_ID', '')
+ZOOM_CLIENT_SECRET = os.environ.get('ZOOM_CLIENT_SECRET', '')
+
+# Microsoft Teams OAuth Settings
+TEAMS_CLIENT_ID = os.environ.get('TEAMS_CLIENT_ID', '')
+TEAMS_CLIENT_SECRET = os.environ.get('TEAMS_CLIENT_SECRET', '')
+TEAMS_TENANT_ID = os.environ.get('TEAMS_TENANT_ID', 'common')
 
 # Gmail SMTP Settings
 GMAIL_ADDRESS = os.environ.get('GMAIL_ADDRESS', '')
@@ -878,39 +888,240 @@ async def apple_calendar_disconnect(user: dict = Depends(get_current_user)):
     )
     return {"message": "Apple Calendar disconnected"}
 
-@api_router.post("/calendar/zoom/connect")
-async def zoom_connect(user: dict = Depends(get_current_user)):
-    """Mock Zoom connection"""
-    await db.users.update_one(
-        {"user_id": user["user_id"]},
-        {"$set": {"zoom_connected": True}}
-    )
-    return {"message": "Zoom connected (mock)"}
+@api_router.get("/calendar/zoom/connect")
+async def zoom_connect(request: Request, user: dict = Depends(get_current_user)):
+    """Initiate Zoom OAuth flow"""
+    origin = request.headers.get("origin", "")
+    if not origin:
+        referer = request.headers.get("referer", "")
+        if referer:
+            from urllib.parse import urlparse
+            parsed = urlparse(referer)
+            origin = f"{parsed.scheme}://{parsed.netloc}"
+            
+    if not ZOOM_CLIENT_ID or not ZOOM_CLIENT_SECRET:
+         # Fallback to mock if credentials not set
+        await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {"zoom_connected": True}}
+        )
+        return {"authorization_url": None, "message": "Zoom connected (mock - no credentials)"}
+
+    redirect_uri = f"{origin}/api/calendar/zoom/callback"
+    
+    # Zoom OAuth URL construction
+    params = {
+        "response_type": "code",
+        "client_id": ZOOM_CLIENT_ID,
+        "redirect_uri": redirect_uri
+    }
+    from urllib.parse import urlencode
+    authorization_url = f"https://zoom.us/oauth/authorize?{urlencode(params)}"
+    
+    # Store state (Zoom doesn't strictly require random state for flow init like Google lib, but good practice)
+    # We use 'state' query param if we were generating it, but Zoom URL just takes redirect.
+    # We'll rely on the redirect handling the code exchange.
+    # Note: For security, a real production app should generate a state, pass it to Zoom, and verify on callback.
+    # Zoom supports 'state' parameter.
+    state = uuid.uuid4().hex
+    authorization_url += f"&state={state}"
+
+    await db.oauth_states.insert_one({
+        "state": state,
+        "user_id": user["user_id"],
+        "redirect_uri": redirect_uri,
+        "provider": "zoom",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {"authorization_url": authorization_url}
+
+@api_router.get("/calendar/zoom/callback")
+async def zoom_callback(code: str, state: str, request: Request):
+    """Handle Zoom OAuth callback"""
+    state_record = await db.oauth_states.find_one({"state": state, "provider": "zoom"}, {"_id": 0})
+    # If using mock flow, state might not exist, but we expect real flow here if code is present
+    
+    # Validation
+    if not state_record:
+         # It's possible the user cancelled or something went wrong? 
+         # Or used mock connect? If code is here, it's real.
+         logger.warning(f"Zoom callback: invalid state {state}")
+         # Attempt to proceed? No, security risk.
+         raise HTTPException(status_code=400, detail="Invalid state")
+
+    user_id = state_record["user_id"]
+    redirect_uri = state_record["redirect_uri"]
+    await db.oauth_states.delete_one({"state": state})
+
+    try:
+        async with httpx.AsyncClient() as client:
+            from base64 import b64encode
+            # Zoom require Basic Auth with ClientID:ClientSecret
+            auth_str = f"{ZOOM_CLIENT_ID}:{ZOOM_CLIENT_SECRET}"
+            b64_auth = b64encode(auth_str.encode()).decode()
+            
+            token_resp = await client.post(
+                "https://zoom.us/oauth/token",
+                params={
+                    "grant_type": "authorization_code",
+                    "code": code,
+                    "redirect_uri": redirect_uri
+                },
+                headers={
+                    "Authorization": f"Basic {b64_auth}"
+                }
+            )
+            
+            if token_resp.status_code != 200:
+                logger.error(f"Zoom Token exchange failed: {token_resp.text}")
+                raise HTTPException(status_code=400, detail="Failed to exchange Zoom code")
+            
+            tokens = token_resp.json()
+            
+        await db.users.update_one(
+            {"user_id": user_id},
+            {"$set": {
+                "zoom_tokens": {
+                    "access_token": tokens.get("access_token"),
+                    "refresh_token": tokens.get("refresh_token"),
+                    "expires_in": tokens.get("expires_in"),
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                },
+                "zoom_connected": True
+            }}
+        )
+        
+        # Determine origin from redirect_uri for final redirect
+        # origin/api/... -> origin
+        origin = redirect_uri.split("/api")[0]
+        
+        return {
+            "status": "success",
+            "message": "Zoom connected successfully",
+            "redirect_url": f"{origin}/integrations"
+        }
+
+    except Exception as e:
+        logger.error(f"Zoom OAuth error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.post("/calendar/zoom/disconnect")
 async def zoom_disconnect(user: dict = Depends(get_current_user)):
     """Disconnect Zoom"""
     await db.users.update_one(
         {"user_id": user["user_id"]},
-        {"$set": {"zoom_connected": False}}
+        {"$unset": {"zoom_tokens": ""}, "$set": {"zoom_connected": False}}
     )
     return {"message": "Zoom disconnected"}
 
-@api_router.post("/calendar/teams/connect")
-async def teams_connect(user: dict = Depends(get_current_user)):
-    """Mock Microsoft Teams connection"""
-    await db.users.update_one(
-        {"user_id": user["user_id"]},
-        {"$set": {"teams_connected": True}}
-    )
-    return {"message": "Microsoft Teams connected (mock)"}
+@api_router.get("/calendar/teams/connect")
+async def teams_connect(request: Request, user: dict = Depends(get_current_user)):
+    """Initiate MS Teams OAuth flow"""
+    origin = request.headers.get("origin", "")
+    if not origin:
+        referer = request.headers.get("referer", "")
+        if referer:
+            from urllib.parse import urlparse
+            parsed = urlparse(referer)
+            origin = f"{parsed.scheme}://{parsed.netloc}"
+
+    if not TEAMS_CLIENT_ID or not TEAMS_CLIENT_SECRET:
+        # Mock fallback
+        await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {"teams_connected": True}}
+        )
+        return {"authorization_url": None, "message": "Teams connected (mock - no credentials)"}
+
+    redirect_uri = f"{origin}/api/calendar/teams/callback"
+    
+    # MS Identity Platform (v2.0)
+    # Scopes: OnlineMeetings.ReadWrite, User.Read, offline_access
+    scope = "OnlineMeetings.ReadWrite User.Read offline_access"
+    
+    params = {
+        "client_id": TEAMS_CLIENT_ID,
+        "response_type": "code",
+        "redirect_uri": redirect_uri,
+        "response_mode": "query",
+        "scope": scope,
+        "state": uuid.uuid4().hex  # Generate state
+    }
+    from urllib.parse import urlencode
+    authorization_url = f"https://login.microsoftonline.com/{TEAMS_TENANT_ID}/oauth2/v2.0/authorize?{urlencode(params)}"
+    
+    await db.oauth_states.insert_one({
+        "state": params["state"],
+        "user_id": user["user_id"],
+        "redirect_uri": redirect_uri,
+        "provider": "teams",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {"authorization_url": authorization_url}
+
+@api_router.get("/calendar/teams/callback")
+async def teams_callback(code: str, state: str, request: Request):
+    """Handle Teams OAuth callback"""
+    state_record = await db.oauth_states.find_one({"state": state, "provider": "teams"}, {"_id": 0})
+    if not state_record:
+         raise HTTPException(status_code=400, detail="Invalid state")
+
+    user_id = state_record["user_id"]
+    redirect_uri = state_record["redirect_uri"]
+    await db.oauth_states.delete_one({"state": state})
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            token_resp = await client.post(
+                f"https://login.microsoftonline.com/{TEAMS_TENANT_ID}/oauth2/v2.0/token",
+                data={
+                    "client_id": TEAMS_CLIENT_ID,
+                    "scope": "OnlineMeetings.ReadWrite User.Read offline_access",
+                    "code": code,
+                    "redirect_uri": redirect_uri,
+                    "grant_type": "authorization_code",
+                    "client_secret": TEAMS_CLIENT_SECRET
+                }
+            )
+            
+            if token_resp.status_code != 200:
+                logger.error(f"Teams Token exchange failed: {token_resp.text}")
+                raise HTTPException(status_code=400, detail="Failed to exchange Teams code")
+            
+            tokens = token_resp.json()
+            
+        await db.users.update_one(
+            {"user_id": user_id},
+            {"$set": {
+                "teams_tokens": {
+                    "access_token": tokens.get("access_token"),
+                    "refresh_token": tokens.get("refresh_token"),
+                    "expires_in": tokens.get("expires_in"),
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                },
+                "teams_connected": True
+            }}
+        )
+        
+        origin = redirect_uri.split("/api")[0]
+        return {
+            "status": "success",
+            "message": "Microsoft Teams connected successfully",
+            "redirect_url": f"{origin}/integrations"
+        }
+
+    except Exception as e:
+        logger.error(f"Teams OAuth error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.post("/calendar/teams/disconnect")
 async def teams_disconnect(user: dict = Depends(get_current_user)):
     """Disconnect Microsoft Teams"""
     await db.users.update_one(
         {"user_id": user["user_id"]},
-        {"$set": {"teams_connected": False}}
+        {"$unset": {"teams_tokens": ""}, "$set": {"teams_connected": False}}
     )
     return {"message": "Microsoft Teams disconnected"}
 
