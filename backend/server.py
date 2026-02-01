@@ -13,7 +13,14 @@ from datetime import datetime, timezone, timedelta
 import jwt
 import bcrypt
 import httpx
-from bson import ObjectId
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import Flow
+from googleapiclient.discovery import build
+from google.auth.transport.requests import Request as GoogleRequest
+import json
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -28,9 +35,20 @@ JWT_SECRET = os.environ.get('JWT_SECRET', 'klevercal-secret-key-change-in-produc
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
 
-# Google OAuth Settings
+# Google Calendar OAuth Settings
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+GOOGLE_SCOPES = [
+    'https://www.googleapis.com/auth/calendar',
+    'https://www.googleapis.com/auth/calendar.events',
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/userinfo.profile',
+    'openid'
+]
+
+# Gmail SMTP Settings
+GMAIL_ADDRESS = os.environ.get('GMAIL_ADDRESS', '')
+GMAIL_APP_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD', '')
 
 # Gemini Settings
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
@@ -64,17 +82,18 @@ class UserResponse(BaseModel):
     picture: Optional[str] = None
     brand_color: str = "#7c3aed"
     timezone: str = "UTC"
+    google_calendar_connected: bool = False
     created_at: datetime
 
 class BookingTypeCreate(BaseModel):
     title: str
     description: Optional[str] = ""
-    duration: int = 30  # minutes
+    duration: int = 30
     color: str = "#7c3aed"
     is_active: bool = True
-    buffer_before: int = 0  # minutes
-    buffer_after: int = 15  # minutes
-    min_notice: int = 60  # minutes
+    buffer_before: int = 0
+    buffer_after: int = 15
+    min_notice: int = 60
     max_bookings_per_day: Optional[int] = None
     questions: List[Dict[str, Any]] = []
 
@@ -96,9 +115,9 @@ class BookingTypeResponse(BaseModel):
     created_at: datetime
 
 class AvailabilitySlot(BaseModel):
-    day: int  # 0=Monday, 6=Sunday
-    start_time: str  # "09:00"
-    end_time: str  # "17:00"
+    day: int
+    start_time: str
+    end_time: str
 
 class AvailabilityCreate(BaseModel):
     slots: List[AvailabilitySlot]
@@ -132,10 +151,11 @@ class AppointmentResponse(BaseModel):
     notes: str
     answers: List[Dict[str, Any]]
     lead_score: Optional[int] = None
+    google_event_id: Optional[str] = None
     created_at: datetime
 
 class NLPScheduleRequest(BaseModel):
-    text: str  # "Let's meet next Tuesday morning"
+    text: str
     booking_type_id: Optional[str] = None
 
 class NLPScheduleResponse(BaseModel):
@@ -151,9 +171,363 @@ class LeadScoreRequest(BaseModel):
     booking_type_title: str
 
 class LeadScoreResponse(BaseModel):
-    score: int  # 0-100
+    score: int
     reasoning: str
-    priority: str  # "high", "medium", "low"
+    priority: str
+
+# ==================== EMAIL SERVICE ====================
+
+def send_booking_confirmation_email(
+    to_email: str,
+    guest_name: str,
+    host_name: str,
+    meeting_title: str,
+    start_time: datetime,
+    end_time: datetime,
+    duration: int,
+    notes: str = ""
+):
+    """Send booking confirmation email via Gmail SMTP"""
+    if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
+        logger.warning("Gmail credentials not configured, skipping email")
+        return False
+    
+    try:
+        # Format date/time
+        date_str = start_time.strftime("%A, %B %d, %Y")
+        time_str = f"{start_time.strftime('%I:%M %p')} - {end_time.strftime('%I:%M %p')}"
+        
+        # Create email content
+        subject = f"Confirmed: {meeting_title} with {host_name}"
+        
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #334155; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .header {{ background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; }}
+                .content {{ background: #f8fafc; padding: 30px; border-radius: 0 0 12px 12px; }}
+                .meeting-card {{ background: white; border-radius: 12px; padding: 24px; margin: 20px 0; border: 1px solid #e2e8f0; }}
+                .detail-row {{ display: flex; margin: 12px 0; }}
+                .detail-label {{ color: #64748b; width: 100px; }}
+                .detail-value {{ color: #1e293b; font-weight: 500; }}
+                .footer {{ text-align: center; color: #94a3b8; font-size: 12px; margin-top: 20px; }}
+                .btn {{ display: inline-block; background: #7c3aed; color: white; padding: 12px 24px; border-radius: 25px; text-decoration: none; margin-top: 15px; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1 style="margin: 0; font-size: 24px;">✓ Meeting Confirmed!</h1>
+                    <p style="margin: 10px 0 0 0; opacity: 0.9;">Your meeting has been scheduled</p>
+                </div>
+                <div class="content">
+                    <p>Hi {guest_name},</p>
+                    <p>Your meeting with <strong>{host_name}</strong> has been confirmed.</p>
+                    
+                    <div class="meeting-card">
+                        <h2 style="margin: 0 0 20px 0; color: #7c3aed;">{meeting_title}</h2>
+                        <div class="detail-row">
+                            <span class="detail-label">📅 Date:</span>
+                            <span class="detail-value">{date_str}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">🕐 Time:</span>
+                            <span class="detail-value">{time_str}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">⏱️ Duration:</span>
+                            <span class="detail-value">{duration} minutes</span>
+                        </div>
+                        {f'<div class="detail-row"><span class="detail-label">📝 Notes:</span><span class="detail-value">{notes}</span></div>' if notes else ''}
+                    </div>
+                    
+                    <p>A calendar invite will be sent separately. Please add this to your calendar.</p>
+                    
+                    <p style="color: #64748b; font-size: 14px;">
+                        Need to reschedule or cancel? Reply to this email.
+                    </p>
+                </div>
+                <div class="footer">
+                    <p>Powered by KleverCal - Smart Scheduling</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Plain text fallback
+        text_content = f"""
+Meeting Confirmed!
+
+Hi {guest_name},
+
+Your meeting with {host_name} has been confirmed.
+
+Meeting: {meeting_title}
+Date: {date_str}
+Time: {time_str}
+Duration: {duration} minutes
+{f'Notes: {notes}' if notes else ''}
+
+A calendar invite will be sent separately.
+
+Need to reschedule or cancel? Reply to this email.
+
+Powered by KleverCal
+        """
+        
+        # Create message
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = f"KleverCal <{GMAIL_ADDRESS}>"
+        msg['To'] = to_email
+        
+        msg.attach(MIMEText(text_content, 'plain'))
+        msg.attach(MIMEText(html_content, 'html'))
+        
+        # Send email
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
+            server.send_message(msg)
+        
+        logger.info(f"Confirmation email sent to {to_email}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to send email: {e}")
+        return False
+
+def send_host_notification_email(
+    host_email: str,
+    host_name: str,
+    guest_name: str,
+    guest_email: str,
+    meeting_title: str,
+    start_time: datetime,
+    end_time: datetime,
+    notes: str = ""
+):
+    """Send notification email to host about new booking"""
+    if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
+        return False
+    
+    try:
+        date_str = start_time.strftime("%A, %B %d, %Y")
+        time_str = f"{start_time.strftime('%I:%M %p')} - {end_time.strftime('%I:%M %p')}"
+        
+        subject = f"New Booking: {meeting_title} with {guest_name}"
+        
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #334155; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .header {{ background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; }}
+                .content {{ background: #f8fafc; padding: 30px; border-radius: 0 0 12px 12px; }}
+                .meeting-card {{ background: white; border-radius: 12px; padding: 24px; margin: 20px 0; border: 1px solid #e2e8f0; }}
+                .footer {{ text-align: center; color: #94a3b8; font-size: 12px; margin-top: 20px; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1 style="margin: 0; font-size: 24px;">📅 New Booking!</h1>
+                </div>
+                <div class="content">
+                    <p>Hi {host_name},</p>
+                    <p>You have a new meeting scheduled:</p>
+                    
+                    <div class="meeting-card">
+                        <h2 style="margin: 0 0 20px 0; color: #7c3aed;">{meeting_title}</h2>
+                        <p><strong>Guest:</strong> {guest_name} ({guest_email})</p>
+                        <p><strong>Date:</strong> {date_str}</p>
+                        <p><strong>Time:</strong> {time_str}</p>
+                        {f'<p><strong>Notes:</strong> {notes}</p>' if notes else ''}
+                    </div>
+                </div>
+                <div class="footer">
+                    <p>Powered by KleverCal</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = f"KleverCal <{GMAIL_ADDRESS}>"
+        msg['To'] = host_email
+        msg.attach(MIMEText(html_content, 'html'))
+        
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
+            server.send_message(msg)
+        
+        logger.info(f"Host notification sent to {host_email}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to send host notification: {e}")
+        return False
+
+# ==================== GOOGLE CALENDAR SERVICE ====================
+
+def get_google_oauth_flow(redirect_uri: str):
+    """Create Google OAuth flow"""
+    return Flow.from_client_config(
+        {
+            "web": {
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "redirect_uris": [redirect_uri]
+            }
+        },
+        scopes=GOOGLE_SCOPES,
+        redirect_uri=redirect_uri
+    )
+
+async def get_google_credentials(user_id: str) -> Optional[Credentials]:
+    """Get Google credentials for a user, refreshing if needed"""
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user or not user.get("google_tokens"):
+        return None
+    
+    tokens = user["google_tokens"]
+    creds = Credentials(
+        token=tokens.get("access_token"),
+        refresh_token=tokens.get("refresh_token"),
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        scopes=GOOGLE_SCOPES
+    )
+    
+    # Refresh if expired
+    if creds.expired and creds.refresh_token:
+        try:
+            creds.refresh(GoogleRequest())
+            # Update stored tokens
+            await db.users.update_one(
+                {"user_id": user_id},
+                {"$set": {
+                    "google_tokens.access_token": creds.token,
+                    "google_tokens.expiry": creds.expiry.isoformat() if creds.expiry else None
+                }}
+            )
+        except Exception as e:
+            logger.error(f"Failed to refresh Google token: {e}")
+            return None
+    
+    return creds
+
+async def create_google_calendar_event(
+    user_id: str,
+    summary: str,
+    description: str,
+    start_time: datetime,
+    end_time: datetime,
+    attendee_email: str
+) -> Optional[str]:
+    """Create a Google Calendar event and return the event ID"""
+    creds = await get_google_credentials(user_id)
+    if not creds:
+        return None
+    
+    try:
+        service = build('calendar', 'v3', credentials=creds)
+        
+        event = {
+            'summary': summary,
+            'description': description,
+            'start': {
+                'dateTime': start_time.isoformat(),
+                'timeZone': 'UTC',
+            },
+            'end': {
+                'dateTime': end_time.isoformat(),
+                'timeZone': 'UTC',
+            },
+            'attendees': [
+                {'email': attendee_email},
+            ],
+            'reminders': {
+                'useDefault': False,
+                'overrides': [
+                    {'method': 'email', 'minutes': 60},
+                    {'method': 'popup', 'minutes': 15},
+                ],
+            },
+        }
+        
+        event = service.events().insert(
+            calendarId='primary',
+            body=event,
+            sendUpdates='all'
+        ).execute()
+        
+        logger.info(f"Created Google Calendar event: {event.get('id')}")
+        return event.get('id')
+        
+    except Exception as e:
+        logger.error(f"Failed to create Google Calendar event: {e}")
+        return None
+
+async def get_google_calendar_busy_times(
+    user_id: str,
+    start_date: datetime,
+    end_date: datetime
+) -> List[Dict[str, datetime]]:
+    """Get busy times from Google Calendar"""
+    creds = await get_google_credentials(user_id)
+    if not creds:
+        return []
+    
+    try:
+        service = build('calendar', 'v3', credentials=creds)
+        
+        # Get freebusy information
+        body = {
+            "timeMin": start_date.isoformat() + 'Z',
+            "timeMax": end_date.isoformat() + 'Z',
+            "items": [{"id": "primary"}]
+        }
+        
+        freebusy = service.freebusy().query(body=body).execute()
+        busy_times = []
+        
+        for busy in freebusy.get('calendars', {}).get('primary', {}).get('busy', []):
+            busy_times.append({
+                'start': datetime.fromisoformat(busy['start'].replace('Z', '+00:00')),
+                'end': datetime.fromisoformat(busy['end'].replace('Z', '+00:00'))
+            })
+        
+        return busy_times
+        
+    except Exception as e:
+        logger.error(f"Failed to get Google Calendar busy times: {e}")
+        return []
+
+async def delete_google_calendar_event(user_id: str, event_id: str) -> bool:
+    """Delete a Google Calendar event"""
+    creds = await get_google_credentials(user_id)
+    if not creds:
+        return False
+    
+    try:
+        service = build('calendar', 'v3', credentials=creds)
+        service.events().delete(calendarId='primary', eventId=event_id).execute()
+        logger.info(f"Deleted Google Calendar event: {event_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to delete Google Calendar event: {e}")
+        return False
 
 # ==================== AUTH HELPERS ====================
 
@@ -172,11 +546,9 @@ def create_jwt_token(user_id: str, email: str) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 async def get_current_user(request: Request) -> dict:
-    # Check cookie first
     session_token = request.cookies.get("session_token")
-    
-    # Then check Authorization header
     auth_header = request.headers.get("Authorization")
+    
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.split(" ")[1]
     elif session_token:
@@ -184,11 +556,7 @@ async def get_current_user(request: Request) -> dict:
     else:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
-    # Check if it's a session token (from Google OAuth)
-    session = await db.user_sessions.find_one(
-        {"session_token": token},
-        {"_id": 0}
-    )
+    session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
     if session:
         expires_at = session.get("expires_at")
         if isinstance(expires_at, str):
@@ -198,21 +566,14 @@ async def get_current_user(request: Request) -> dict:
         if expires_at < datetime.now(timezone.utc):
             raise HTTPException(status_code=401, detail="Session expired")
         
-        user = await db.users.find_one(
-            {"user_id": session["user_id"]},
-            {"_id": 0}
-        )
+        user = await db.users.find_one({"user_id": session["user_id"]}, {"_id": 0})
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
         return user
     
-    # Otherwise try JWT
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        user = await db.users.find_one(
-            {"user_id": payload["user_id"]},
-            {"_id": 0}
-        )
+        user = await db.users.find_one({"user_id": payload["user_id"]}, {"_id": 0})
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
         return user
@@ -238,26 +599,19 @@ async def register(user_data: UserCreate):
         "picture": None,
         "brand_color": "#7c3aed",
         "timezone": "UTC",
+        "google_calendar_connected": False,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.users.insert_one(user_doc)
     
-    # Create default availability (Mon-Fri 9-5)
-    default_slots = []
-    for day in range(5):  # Monday to Friday
-        default_slots.append({
-            "day": day,
-            "start_time": "09:00",
-            "end_time": "17:00"
-        })
-    
-    availability_doc = {
+    # Create default availability
+    default_slots = [{"day": day, "start_time": "09:00", "end_time": "17:00"} for day in range(5)]
+    await db.availability.insert_one({
         "availability_id": f"avail_{uuid.uuid4().hex[:12]}",
         "user_id": user_id,
         "slots": default_slots,
         "updated_at": datetime.now(timezone.utc).isoformat()
-    }
-    await db.availability.insert_one(availability_doc)
+    })
     
     token = create_jwt_token(user_id, user_data.email)
     return {"token": token, "user_id": user_id, "email": user_data.email, "name": user_data.name}
@@ -283,10 +637,10 @@ async def get_me(user: dict = Depends(get_current_user)):
         picture=user.get("picture"),
         brand_color=user.get("brand_color", "#7c3aed"),
         timezone=user.get("timezone", "UTC"),
+        google_calendar_connected=user.get("google_calendar_connected", False),
         created_at=created_at
     )
 
-# REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
 @api_router.post("/auth/session")
 async def process_session(request: Request, response: Response):
     body = await request.json()
@@ -295,7 +649,6 @@ async def process_session(request: Request, response: Response):
     if not session_id:
         raise HTTPException(status_code=400, detail="Session ID required")
     
-    # Exchange session_id for user data
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
@@ -303,26 +656,19 @@ async def process_session(request: Request, response: Response):
         )
         if resp.status_code != 200:
             raise HTTPException(status_code=401, detail="Invalid session")
-        
         auth_data = resp.json()
     
-    # Check if user exists
     existing_user = await db.users.find_one({"email": auth_data["email"]}, {"_id": 0})
     
     if existing_user:
         user_id = existing_user["user_id"]
-        # Update user info
         await db.users.update_one(
             {"user_id": user_id},
-            {"$set": {
-                "name": auth_data["name"],
-                "picture": auth_data.get("picture")
-            }}
+            {"$set": {"name": auth_data["name"], "picture": auth_data.get("picture")}}
         )
     else:
-        # Create new user
         user_id = f"user_{uuid.uuid4().hex[:12]}"
-        user_doc = {
+        await db.users.insert_one({
             "user_id": user_id,
             "email": auth_data["email"],
             "name": auth_data["name"],
@@ -330,67 +676,206 @@ async def process_session(request: Request, response: Response):
             "password_hash": "",
             "brand_color": "#7c3aed",
             "timezone": "UTC",
+            "google_calendar_connected": False,
             "created_at": datetime.now(timezone.utc).isoformat()
-        }
-        await db.users.insert_one(user_doc)
+        })
         
-        # Create default availability
-        default_slots = []
-        for day in range(5):
-            default_slots.append({
-                "day": day,
-                "start_time": "09:00",
-                "end_time": "17:00"
-            })
-        
-        availability_doc = {
+        default_slots = [{"day": day, "start_time": "09:00", "end_time": "17:00"} for day in range(5)]
+        await db.availability.insert_one({
             "availability_id": f"avail_{uuid.uuid4().hex[:12]}",
             "user_id": user_id,
             "slots": default_slots,
             "updated_at": datetime.now(timezone.utc).isoformat()
-        }
-        await db.availability.insert_one(availability_doc)
+        })
     
-    # Create session
     session_token = auth_data.get("session_token", f"session_{uuid.uuid4().hex}")
-    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
-    
-    session_doc = {
+    await db.user_sessions.insert_one({
         "session_id": f"sess_{uuid.uuid4().hex[:12]}",
         "user_id": user_id,
         "session_token": session_token,
-        "expires_at": expires_at.isoformat(),
+        "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
         "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    await db.user_sessions.insert_one(session_doc)
+    })
     
-    # Set cookie
     response.set_cookie(
-        key="session_token",
-        value=session_token,
-        httponly=True,
-        secure=True,
-        samesite="none",
-        max_age=7 * 24 * 60 * 60,
-        path="/"
+        key="session_token", value=session_token, httponly=True,
+        secure=True, samesite="none", max_age=7*24*60*60, path="/"
     )
     
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-    return {
-        "user_id": user["user_id"],
-        "email": user["email"],
-        "name": user["name"],
-        "picture": user.get("picture")
-    }
+    return {"user_id": user["user_id"], "email": user["email"], "name": user["name"], "picture": user.get("picture")}
 
 @api_router.post("/auth/logout")
 async def logout(request: Request, response: Response):
     session_token = request.cookies.get("session_token")
     if session_token:
         await db.user_sessions.delete_one({"session_token": session_token})
-    
     response.delete_cookie(key="session_token", path="/")
     return {"message": "Logged out successfully"}
+
+# ==================== GOOGLE CALENDAR OAUTH ROUTES ====================
+
+@api_router.get("/calendar/google/connect")
+async def google_calendar_connect(request: Request, user: dict = Depends(get_current_user)):
+    """Initiate Google Calendar OAuth flow"""
+    # Get the frontend URL from the request origin
+    origin = request.headers.get("origin", "")
+    if not origin:
+        referer = request.headers.get("referer", "")
+        if referer:
+            from urllib.parse import urlparse
+            parsed = urlparse(referer)
+            origin = f"{parsed.scheme}://{parsed.netloc}"
+    
+    redirect_uri = f"{origin}/api/calendar/google/callback"
+    
+    flow = get_google_oauth_flow(redirect_uri)
+    authorization_url, state = flow.authorization_url(
+        access_type='offline',
+        include_granted_scopes='true',
+        prompt='consent'
+    )
+    
+    # Store state with user_id for callback
+    await db.oauth_states.insert_one({
+        "state": state,
+        "user_id": user["user_id"],
+        "redirect_uri": redirect_uri,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {"authorization_url": authorization_url}
+
+@api_router.get("/calendar/google/callback")
+async def google_calendar_callback(code: str, state: str, request: Request):
+    """Handle Google Calendar OAuth callback"""
+    # Find the state record
+    state_record = await db.oauth_states.find_one({"state": state}, {"_id": 0})
+    if not state_record:
+        raise HTTPException(status_code=400, detail="Invalid state")
+    
+    user_id = state_record["user_id"]
+    redirect_uri = state_record["redirect_uri"]
+    
+    # Delete used state
+    await db.oauth_states.delete_one({"state": state})
+    
+    try:
+        # Exchange code for tokens using direct request (avoids scope mismatch issues)
+        async with httpx.AsyncClient() as client:
+            token_resp = await client.post(
+                'https://oauth2.googleapis.com/token',
+                data={
+                    'code': code,
+                    'client_id': GOOGLE_CLIENT_ID,
+                    'client_secret': GOOGLE_CLIENT_SECRET,
+                    'redirect_uri': redirect_uri,
+                    'grant_type': 'authorization_code'
+                }
+            )
+            
+            if token_resp.status_code != 200:
+                logger.error(f"Token exchange failed: {token_resp.text}")
+                raise HTTPException(status_code=400, detail="Failed to exchange code for tokens")
+            
+            tokens = token_resp.json()
+        
+        # Store tokens
+        await db.users.update_one(
+            {"user_id": user_id},
+            {"$set": {
+                "google_tokens": {
+                    "access_token": tokens.get("access_token"),
+                    "refresh_token": tokens.get("refresh_token"),
+                    "token_type": tokens.get("token_type"),
+                    "expiry": (datetime.now(timezone.utc) + timedelta(seconds=tokens.get("expires_in", 3600))).isoformat()
+                },
+                "google_calendar_connected": True
+            }}
+        )
+        
+        logger.info(f"Google Calendar connected for user {user_id}")
+        
+        # Redirect back to profile page
+        origin = redirect_uri.replace("/api/calendar/google/callback", "")
+        return RedirectResponse(url=f"{origin}/profile?calendar_connected=true")
+        
+    except Exception as e:
+        logger.error(f"Google Calendar OAuth error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/calendar/google/disconnect")
+async def google_calendar_disconnect(user: dict = Depends(get_current_user)):
+    """Disconnect Google Calendar"""
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$unset": {"google_tokens": ""}, "$set": {"google_calendar_connected": False}}
+    )
+    return {"message": "Google Calendar disconnected"}
+
+@api_router.get("/calendar/google/status")
+async def google_calendar_status(user: dict = Depends(get_current_user)):
+    """Check Google Calendar connection status"""
+    return {
+        "connected": user.get("google_calendar_connected", False),
+        "has_tokens": bool(user.get("google_tokens"))
+    }
+
+@api_router.get("/calendar/google/events")
+async def get_google_calendar_events(
+    start_date: str,
+    end_date: str,
+    user: dict = Depends(get_current_user)
+):
+    """Get events from Google Calendar"""
+    creds = await get_google_credentials(user["user_id"])
+    if not creds:
+        raise HTTPException(status_code=400, detail="Google Calendar not connected")
+    
+    try:
+        service = build('calendar', 'v3', credentials=creds)
+        events_result = service.events().list(
+            calendarId='primary',
+            timeMin=f"{start_date}T00:00:00Z",
+            timeMax=f"{end_date}T23:59:59Z",
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+        
+        events = []
+        for event in events_result.get('items', []):
+            start = event['start'].get('dateTime', event['start'].get('date'))
+            end = event['end'].get('dateTime', event['end'].get('date'))
+            events.append({
+                'id': event['id'],
+                'summary': event.get('summary', 'No title'),
+                'start': start,
+                'end': end,
+                'description': event.get('description', '')
+            })
+        
+        return {"events": events}
+        
+    except Exception as e:
+        logger.error(f"Failed to get Google Calendar events: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/calendar/google/busy")
+async def get_google_calendar_busy(
+    start_date: str,
+    end_date: str,
+    user: dict = Depends(get_current_user)
+):
+    """Get busy times from Google Calendar"""
+    start = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+    end = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+    
+    busy_times = await get_google_calendar_busy_times(user["user_id"], start, end)
+    
+    return {"busy_times": [
+        {"start": bt["start"].isoformat(), "end": bt["end"].isoformat()}
+        for bt in busy_times
+    ]}
 
 # ==================== BOOKING TYPES ROUTES ====================
 
@@ -422,37 +907,19 @@ async def create_booking_type(data: BookingTypeCreate, user: dict = Depends(get_
     }
     await db.booking_types.insert_one(doc)
     
-    created_at = datetime.fromisoformat(doc["created_at"])
-    return BookingTypeResponse(**{**doc, "created_at": created_at})
+    return BookingTypeResponse(**{**doc, "created_at": datetime.fromisoformat(doc["created_at"])})
 
 @api_router.get("/booking-types", response_model=List[BookingTypeResponse])
 async def get_booking_types(user: dict = Depends(get_current_user)):
-    types = await db.booking_types.find(
-        {"user_id": user["user_id"]},
-        {"_id": 0}
-    ).to_list(100)
-    
-    result = []
-    for t in types:
-        created_at = t.get("created_at")
-        if isinstance(created_at, str):
-            created_at = datetime.fromisoformat(created_at)
-        result.append(BookingTypeResponse(**{**t, "created_at": created_at}))
-    return result
+    types = await db.booking_types.find({"user_id": user["user_id"]}, {"_id": 0}).to_list(100)
+    return [BookingTypeResponse(**{**t, "created_at": datetime.fromisoformat(t["created_at"]) if isinstance(t["created_at"], str) else t["created_at"]}) for t in types]
 
 @api_router.get("/booking-types/{booking_type_id}", response_model=BookingTypeResponse)
 async def get_booking_type(booking_type_id: str, user: dict = Depends(get_current_user)):
-    bt = await db.booking_types.find_one(
-        {"booking_type_id": booking_type_id, "user_id": user["user_id"]},
-        {"_id": 0}
-    )
+    bt = await db.booking_types.find_one({"booking_type_id": booking_type_id, "user_id": user["user_id"]}, {"_id": 0})
     if not bt:
         raise HTTPException(status_code=404, detail="Booking type not found")
-    
-    created_at = bt.get("created_at")
-    if isinstance(created_at, str):
-        created_at = datetime.fromisoformat(created_at)
-    return BookingTypeResponse(**{**bt, "created_at": created_at})
+    return BookingTypeResponse(**{**bt, "created_at": datetime.fromisoformat(bt["created_at"]) if isinstance(bt["created_at"], str) else bt["created_at"]})
 
 @api_router.put("/booking-types/{booking_type_id}", response_model=BookingTypeResponse)
 async def update_booking_type(booking_type_id: str, data: BookingTypeCreate, user: dict = Depends(get_current_user)):
@@ -466,20 +933,12 @@ async def update_booking_type(booking_type_id: str, data: BookingTypeCreate, use
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Booking type not found")
     
-    bt = await db.booking_types.find_one(
-        {"booking_type_id": booking_type_id},
-        {"_id": 0}
-    )
-    created_at = bt.get("created_at")
-    if isinstance(created_at, str):
-        created_at = datetime.fromisoformat(created_at)
-    return BookingTypeResponse(**{**bt, "created_at": created_at})
+    bt = await db.booking_types.find_one({"booking_type_id": booking_type_id}, {"_id": 0})
+    return BookingTypeResponse(**{**bt, "created_at": datetime.fromisoformat(bt["created_at"]) if isinstance(bt["created_at"], str) else bt["created_at"]})
 
 @api_router.delete("/booking-types/{booking_type_id}")
 async def delete_booking_type(booking_type_id: str, user: dict = Depends(get_current_user)):
-    result = await db.booking_types.delete_one(
-        {"booking_type_id": booking_type_id, "user_id": user["user_id"]}
-    )
+    result = await db.booking_types.delete_one({"booking_type_id": booking_type_id, "user_id": user["user_id"]})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Booking type not found")
     return {"message": "Deleted successfully"}
@@ -488,19 +947,9 @@ async def delete_booking_type(booking_type_id: str, user: dict = Depends(get_cur
 
 @api_router.get("/availability", response_model=AvailabilityResponse)
 async def get_availability(user: dict = Depends(get_current_user)):
-    avail = await db.availability.find_one(
-        {"user_id": user["user_id"]},
-        {"_id": 0}
-    )
+    avail = await db.availability.find_one({"user_id": user["user_id"]}, {"_id": 0})
     if not avail:
-        # Create default
-        default_slots = []
-        for day in range(5):
-            default_slots.append({
-                "day": day,
-                "start_time": "09:00",
-                "end_time": "17:00"
-            })
+        default_slots = [{"day": day, "start_time": "09:00", "end_time": "17:00"} for day in range(5)]
         avail = {
             "availability_id": f"avail_{uuid.uuid4().hex[:12]}",
             "user_id": user["user_id"],
@@ -520,17 +969,11 @@ async def update_availability(data: AvailabilityCreate, user: dict = Depends(get
     
     await db.availability.update_one(
         {"user_id": user["user_id"]},
-        {"$set": {
-            "slots": slots,
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }},
+        {"$set": {"slots": slots, "updated_at": datetime.now(timezone.utc).isoformat()}},
         upsert=True
     )
     
-    avail = await db.availability.find_one(
-        {"user_id": user["user_id"]},
-        {"_id": 0}
-    )
+    avail = await db.availability.find_one({"user_id": user["user_id"]}, {"_id": 0})
     updated_at = avail.get("updated_at")
     if isinstance(updated_at, str):
         updated_at = datetime.fromisoformat(updated_at)
@@ -540,94 +983,55 @@ async def update_availability(data: AvailabilityCreate, user: dict = Depends(get
 
 @api_router.get("/public/user/{user_id}")
 async def get_public_user(user_id: str):
-    user = await db.users.find_one(
-        {"user_id": user_id},
-        {"_id": 0, "password_hash": 0}
-    )
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0, "google_tokens": 0})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return {
-        "user_id": user["user_id"],
-        "name": user["name"],
-        "picture": user.get("picture"),
-        "brand_color": user.get("brand_color", "#7c3aed")
-    }
+    return {"user_id": user["user_id"], "name": user["name"], "picture": user.get("picture"), "brand_color": user.get("brand_color", "#7c3aed")}
 
 @api_router.get("/public/booking-types/{user_id}")
 async def get_public_booking_types(user_id: str):
-    types = await db.booking_types.find(
-        {"user_id": user_id, "is_active": True},
-        {"_id": 0}
-    ).to_list(100)
+    types = await db.booking_types.find({"user_id": user_id, "is_active": True}, {"_id": 0}).to_list(100)
     return types
 
 @api_router.get("/public/booking-type/{slug}")
 async def get_public_booking_type_by_slug(slug: str):
-    bt = await db.booking_types.find_one(
-        {"slug": slug, "is_active": True},
-        {"_id": 0}
-    )
+    bt = await db.booking_types.find_one({"slug": slug, "is_active": True}, {"_id": 0})
     if not bt:
         raise HTTPException(status_code=404, detail="Booking type not found")
     
-    user = await db.users.find_one(
-        {"user_id": bt["user_id"]},
-        {"_id": 0, "password_hash": 0}
-    )
+    user = await db.users.find_one({"user_id": bt["user_id"]}, {"_id": 0, "password_hash": 0, "google_tokens": 0})
     return {
         "booking_type": bt,
-        "host": {
-            "user_id": user["user_id"],
-            "name": user["name"],
-            "picture": user.get("picture"),
-            "brand_color": user.get("brand_color", "#7c3aed")
-        }
+        "host": {"user_id": user["user_id"], "name": user["name"], "picture": user.get("picture"), "brand_color": user.get("brand_color", "#7c3aed")}
     }
 
 @api_router.get("/public/availability/{user_id}")
 async def get_public_availability(user_id: str):
-    avail = await db.availability.find_one(
-        {"user_id": user_id},
-        {"_id": 0}
-    )
-    if not avail:
-        return {"slots": []}
-    return {"slots": avail.get("slots", [])}
+    avail = await db.availability.find_one({"user_id": user_id}, {"_id": 0})
+    return {"slots": avail.get("slots", []) if avail else []}
 
 @api_router.get("/public/slots/{user_id}/{booking_type_id}")
 async def get_available_slots(user_id: str, booking_type_id: str, date: str):
-    """Get available time slots for a specific date"""
-    # Parse the date
+    """Get available time slots for a specific date, considering Google Calendar busy times"""
     try:
         target_date = datetime.strptime(date, "%Y-%m-%d").date()
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
     
-    # Get booking type
-    bt = await db.booking_types.find_one(
-        {"booking_type_id": booking_type_id, "user_id": user_id},
-        {"_id": 0}
-    )
+    bt = await db.booking_types.find_one({"booking_type_id": booking_type_id, "user_id": user_id}, {"_id": 0})
     if not bt:
         raise HTTPException(status_code=404, detail="Booking type not found")
     
-    # Get availability
-    avail = await db.availability.find_one(
-        {"user_id": user_id},
-        {"_id": 0}
-    )
+    avail = await db.availability.find_one({"user_id": user_id}, {"_id": 0})
     if not avail:
         return {"slots": []}
     
-    # Get day of week (0=Monday)
     day_of_week = target_date.weekday()
-    
-    # Find availability for this day
     day_slots = [s for s in avail.get("slots", []) if s["day"] == day_of_week]
     if not day_slots:
         return {"slots": []}
     
-    # Get existing appointments for this date
+    # Get existing KleverCal appointments
     start_of_day = datetime.combine(target_date, datetime.min.time()).replace(tzinfo=timezone.utc)
     end_of_day = datetime.combine(target_date, datetime.max.time()).replace(tzinfo=timezone.utc)
     
@@ -636,6 +1040,18 @@ async def get_available_slots(user_id: str, booking_type_id: str, date: str):
         "status": {"$ne": "cancelled"},
         "start_time": {"$gte": start_of_day.isoformat(), "$lt": end_of_day.isoformat()}
     }, {"_id": 0}).to_list(100)
+    
+    # Get Google Calendar busy times
+    google_busy = await get_google_calendar_busy_times(user_id, start_of_day, end_of_day)
+    
+    # Combine all busy times
+    all_busy = []
+    for appt in existing:
+        appt_start = datetime.fromisoformat(appt["start_time"].replace("Z", "+00:00"))
+        appt_end = datetime.fromisoformat(appt["end_time"].replace("Z", "+00:00"))
+        all_busy.append({"start": appt_start, "end": appt_end})
+    
+    all_busy.extend(google_busy)
     
     # Generate available slots
     duration = bt["duration"]
@@ -659,22 +1075,16 @@ async def get_available_slots(user_id: str, booking_type_id: str, date: str):
         
         current = slot_start
         while current + timedelta(minutes=duration) <= slot_end:
-            # Check min notice
             if current < now + timedelta(minutes=min_notice):
                 current += timedelta(minutes=30)
                 continue
             
-            # Check for conflicts
             slot_with_buffer_start = current - timedelta(minutes=buffer_before)
             slot_with_buffer_end = current + timedelta(minutes=duration + buffer_after)
             
             is_available = True
-            for appt in existing:
-                appt_start = datetime.fromisoformat(appt["start_time"].replace("Z", "+00:00"))
-                appt_end = datetime.fromisoformat(appt["end_time"].replace("Z", "+00:00"))
-                
-                # Check overlap
-                if not (slot_with_buffer_end <= appt_start or slot_with_buffer_start >= appt_end):
+            for busy in all_busy:
+                if not (slot_with_buffer_end <= busy["start"] or slot_with_buffer_start >= busy["end"]):
                     is_available = False
                     break
             
@@ -693,19 +1103,31 @@ async def get_available_slots(user_id: str, booking_type_id: str, date: str):
 
 @api_router.post("/appointments", response_model=AppointmentResponse)
 async def create_appointment(data: AppointmentCreate):
-    """Public endpoint to create an appointment (booking)"""
-    # Verify booking type exists
-    bt = await db.booking_types.find_one(
-        {"booking_type_id": data.booking_type_id},
-        {"_id": 0}
-    )
+    """Public endpoint to create an appointment with email confirmation and Google Calendar sync"""
+    bt = await db.booking_types.find_one({"booking_type_id": data.booking_type_id}, {"_id": 0})
     if not bt:
         raise HTTPException(status_code=404, detail="Booking type not found")
     
-    # Calculate end time
+    host = await db.users.find_one({"user_id": data.host_user_id}, {"_id": 0, "password_hash": 0})
+    if not host:
+        raise HTTPException(status_code=404, detail="Host not found")
+    
     end_time = data.start_time + timedelta(minutes=bt["duration"])
     
     appointment_id = f"appt_{uuid.uuid4().hex[:12]}"
+    
+    # Create Google Calendar event if connected
+    google_event_id = None
+    if host.get("google_calendar_connected"):
+        google_event_id = await create_google_calendar_event(
+            user_id=data.host_user_id,
+            summary=f"{bt['title']} with {data.guest_name}",
+            description=f"Guest: {data.guest_name}\nEmail: {data.guest_email}\nNotes: {data.notes or 'None'}",
+            start_time=data.start_time,
+            end_time=end_time,
+            attendee_email=data.guest_email
+        )
+    
     doc = {
         "appointment_id": appointment_id,
         "booking_type_id": data.booking_type_id,
@@ -718,9 +1140,33 @@ async def create_appointment(data: AppointmentCreate):
         "notes": data.notes or "",
         "answers": data.answers,
         "lead_score": None,
+        "google_event_id": google_event_id,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.appointments.insert_one(doc)
+    
+    # Send confirmation emails
+    send_booking_confirmation_email(
+        to_email=data.guest_email,
+        guest_name=data.guest_name,
+        host_name=host["name"],
+        meeting_title=bt["title"],
+        start_time=data.start_time,
+        end_time=end_time,
+        duration=bt["duration"],
+        notes=data.notes or ""
+    )
+    
+    send_host_notification_email(
+        host_email=host["email"],
+        host_name=host["name"],
+        guest_name=data.guest_name,
+        guest_email=data.guest_email,
+        meeting_title=bt["title"],
+        start_time=data.start_time,
+        end_time=end_time,
+        notes=data.notes or ""
+    )
     
     return AppointmentResponse(**{
         **doc,
@@ -730,10 +1176,7 @@ async def create_appointment(data: AppointmentCreate):
     })
 
 @api_router.get("/appointments", response_model=List[AppointmentResponse])
-async def get_appointments(
-    status: Optional[str] = None,
-    user: dict = Depends(get_current_user)
-):
+async def get_appointments(status: Optional[str] = None, user: dict = Depends(get_current_user)):
     query = {"host_user_id": user["user_id"]}
     if status:
         query["status"] = status
@@ -762,20 +1205,25 @@ async def get_appointments(
     return sorted(result, key=lambda x: x.start_time, reverse=True)
 
 @api_router.put("/appointments/{appointment_id}/status")
-async def update_appointment_status(
-    appointment_id: str,
-    status: str,
-    user: dict = Depends(get_current_user)
-):
+async def update_appointment_status(appointment_id: str, status: str, user: dict = Depends(get_current_user)):
     if status not in ["confirmed", "cancelled", "completed"]:
         raise HTTPException(status_code=400, detail="Invalid status")
     
-    result = await db.appointments.update_one(
+    appt = await db.appointments.find_one(
         {"appointment_id": appointment_id, "host_user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    if not appt:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+    
+    # Delete Google Calendar event if cancelling
+    if status == "cancelled" and appt.get("google_event_id"):
+        await delete_google_calendar_event(user["user_id"], appt["google_event_id"])
+    
+    await db.appointments.update_one(
+        {"appointment_id": appointment_id},
         {"$set": {"status": status, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Appointment not found")
     
     return {"message": "Status updated"}
 
@@ -783,12 +1231,8 @@ async def update_appointment_status(
 
 @api_router.post("/ai/parse-schedule", response_model=NLPScheduleResponse)
 async def parse_natural_language_schedule(data: NLPScheduleRequest, user: dict = Depends(get_current_user)):
-    """Parse natural language scheduling request using Gemini"""
     if not EMERGENT_LLM_KEY:
-        return NLPScheduleResponse(
-            interpretation="AI features require API key configuration",
-            confidence=0.0
-        )
+        return NLPScheduleResponse(interpretation="AI features require API key configuration", confidence=0.0)
     
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
@@ -796,21 +1240,19 @@ async def parse_natural_language_schedule(data: NLPScheduleRequest, user: dict =
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY,
             session_id=f"nlp_{uuid.uuid4().hex[:8]}",
-            system_message="""You are a scheduling assistant. Parse the user's natural language request and extract:
+            system_message=f"""You are a scheduling assistant. Parse the user's natural language request and extract:
 1. The suggested date (in YYYY-MM-DD format)
 2. The suggested time (in HH:MM format, 24-hour)
 3. Your confidence level (0.0 to 1.0)
 
-Today's date is """ + datetime.now().strftime("%Y-%m-%d") + """.
+Today's date is {datetime.now().strftime("%Y-%m-%d")}.
 
 Respond ONLY in this JSON format:
-{"date": "YYYY-MM-DD", "time": "HH:MM", "confidence": 0.9, "interpretation": "brief explanation"}"""
+{{"date": "YYYY-MM-DD", "time": "HH:MM", "confidence": 0.9, "interpretation": "brief explanation"}}"""
         ).with_model("gemini", "gemini-3-flash-preview")
         
         response = await chat.send_message(UserMessage(text=data.text))
         
-        # Parse JSON response
-        import json
         try:
             result = json.loads(response.strip())
             return NLPScheduleResponse(
@@ -820,26 +1262,15 @@ Respond ONLY in this JSON format:
                 interpretation=result.get("interpretation", "")
             )
         except json.JSONDecodeError:
-            return NLPScheduleResponse(
-                interpretation=response,
-                confidence=0.5
-            )
+            return NLPScheduleResponse(interpretation=response, confidence=0.5)
     except Exception as e:
         logger.error(f"AI parse error: {e}")
-        return NLPScheduleResponse(
-            interpretation=f"Could not parse: {str(e)}",
-            confidence=0.0
-        )
+        return NLPScheduleResponse(interpretation=f"Could not parse: {str(e)}", confidence=0.0)
 
 @api_router.post("/ai/lead-score", response_model=LeadScoreResponse)
 async def calculate_lead_score(data: LeadScoreRequest, user: dict = Depends(get_current_user)):
-    """Calculate lead score based on booking form responses using Gemini"""
     if not EMERGENT_LLM_KEY:
-        return LeadScoreResponse(
-            score=50,
-            reasoning="AI features require API key configuration",
-            priority="medium"
-        )
+        return LeadScoreResponse(score=50, reasoning="AI features require API key configuration", priority="medium")
     
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
@@ -852,12 +1283,6 @@ async def calculate_lead_score(data: LeadScoreRequest, user: dict = Depends(get_
 2. Brief reasoning for the score
 3. Priority level: "high", "medium", or "low"
 
-Consider factors like:
-- Email domain (company vs personal)
-- Quality and detail of responses
-- Relevance to the meeting type
-- Engagement signals
-
 Respond ONLY in this JSON format:
 {"score": 75, "reasoning": "brief explanation", "priority": "high"}"""
         ).with_model("gemini", "gemini-3-flash-preview")
@@ -869,7 +1294,6 @@ Form Responses: {data.answers}"""
         
         response = await chat.send_message(UserMessage(text=message))
         
-        import json
         try:
             result = json.loads(response.strip())
             return LeadScoreResponse(
@@ -878,40 +1302,23 @@ Form Responses: {data.answers}"""
                 priority=result.get("priority", "medium")
             )
         except json.JSONDecodeError:
-            return LeadScoreResponse(
-                score=50,
-                reasoning=response,
-                priority="medium"
-            )
+            return LeadScoreResponse(score=50, reasoning=response, priority="medium")
     except Exception as e:
         logger.error(f"Lead score error: {e}")
-        return LeadScoreResponse(
-            score=50,
-            reasoning=f"Could not calculate: {str(e)}",
-            priority="medium"
-        )
+        return LeadScoreResponse(score=50, reasoning=f"Could not calculate: {str(e)}", priority="medium")
 
 # ==================== USER PROFILE ROUTES ====================
 
 @api_router.put("/profile")
-async def update_profile(
-    request: Request,
-    user: dict = Depends(get_current_user)
-):
+async def update_profile(request: Request, user: dict = Depends(get_current_user)):
     body = await request.json()
     allowed_fields = ["name", "brand_color", "timezone", "picture"]
     update_data = {k: v for k, v in body.items() if k in allowed_fields}
     
     if update_data:
-        await db.users.update_one(
-            {"user_id": user["user_id"]},
-            {"$set": update_data}
-        )
+        await db.users.update_one({"user_id": user["user_id"]}, {"$set": update_data})
     
-    updated = await db.users.find_one(
-        {"user_id": user["user_id"]},
-        {"_id": 0, "password_hash": 0}
-    )
+    updated = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0, "password_hash": 0, "google_tokens": 0})
     return updated
 
 # ==================== DASHBOARD STATS ====================
@@ -920,17 +1327,13 @@ async def update_profile(
 async def get_dashboard_stats(user: dict = Depends(get_current_user)):
     now = datetime.now(timezone.utc)
     
-    # Total appointments
     total = await db.appointments.count_documents({"host_user_id": user["user_id"]})
-    
-    # Upcoming appointments
     upcoming = await db.appointments.count_documents({
         "host_user_id": user["user_id"],
         "status": "confirmed",
         "start_time": {"$gte": now.isoformat()}
     })
     
-    # This week's appointments
     week_start = now - timedelta(days=now.weekday())
     week_end = week_start + timedelta(days=7)
     this_week = await db.appointments.count_documents({
@@ -938,11 +1341,7 @@ async def get_dashboard_stats(user: dict = Depends(get_current_user)):
         "start_time": {"$gte": week_start.isoformat(), "$lt": week_end.isoformat()}
     })
     
-    # Active booking types
-    active_types = await db.booking_types.count_documents({
-        "user_id": user["user_id"],
-        "is_active": True
-    })
+    active_types = await db.booking_types.count_documents({"user_id": user["user_id"], "is_active": True})
     
     return {
         "total_appointments": total,
@@ -951,11 +1350,28 @@ async def get_dashboard_stats(user: dict = Depends(get_current_user)):
         "active_booking_types": active_types
     }
 
+# ==================== EMAIL TEST ROUTE ====================
+
+@api_router.post("/test/email")
+async def test_email(user: dict = Depends(get_current_user)):
+    """Test email sending"""
+    success = send_booking_confirmation_email(
+        to_email=user["email"],
+        guest_name="Test User",
+        host_name=user["name"],
+        meeting_title="Test Meeting",
+        start_time=datetime.now(timezone.utc) + timedelta(hours=24),
+        end_time=datetime.now(timezone.utc) + timedelta(hours=24, minutes=30),
+        duration=30,
+        notes="This is a test email"
+    )
+    return {"success": success, "message": "Test email sent" if success else "Failed to send email"}
+
 # ==================== ROOT ====================
 
 @api_router.get("/")
 async def root():
-    return {"message": "KleverCal API", "version": "1.0.0"}
+    return {"message": "KleverCal API", "version": "1.1.0", "features": ["calendar_sync", "email_notifications"]}
 
 # Include router
 app.include_router(api_router)
