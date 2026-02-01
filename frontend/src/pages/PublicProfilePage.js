@@ -98,7 +98,7 @@ const PublicProfilePage = () => {
                             {booking_types.map((type) => (
                                 <Link
                                     key={type.booking_type_id}
-                                    to={`/${type.slug}`}
+                                    to={`/book/${type.slug}`}
                                     className="group block bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 rounded-xl hover:shadow-md hover:border-violet-300 dark:hover:border-violet-700 transition-all shadow-sm"
                                     style={{ borderLeft: `6px solid ${type.color}` }}
                                 >
