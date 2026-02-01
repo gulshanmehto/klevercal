@@ -95,6 +95,8 @@ class UserResponse(BaseModel):
     use_branding: bool = True
     slug: Optional[str] = None
     google_calendar_connected: bool = False
+    outlook_calendar_connected: bool = False
+    apple_calendar_connected: bool = False
     created_at: datetime
 
 class BookingTypeCreate(BaseModel):
@@ -670,6 +672,8 @@ async def get_me(user: dict = Depends(get_current_user)):
         use_branding=user.get("use_branding", True),
         slug=user.get("slug"),
         google_calendar_connected=user.get("google_calendar_connected", False),
+        outlook_calendar_connected=user.get("outlook_calendar_connected", False),
+        apple_calendar_connected=user.get("apple_calendar_connected", False),
         created_at=created_at
     )
 
@@ -790,6 +794,42 @@ async def google_calendar_status(user: dict = Depends(get_current_user)):
         "connected": user.get("google_calendar_connected", False),
         "has_tokens": bool(user.get("google_tokens"))
     }
+
+@api_router.post("/calendar/outlook/connect")
+async def outlook_calendar_connect(user: dict = Depends(get_current_user)):
+    """Mock Outlook connection"""
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"outlook_calendar_connected": True}}
+    )
+    return {"message": "Outlook Calendar connected (mock)"}
+
+@api_router.post("/calendar/outlook/disconnect")
+async def outlook_calendar_disconnect(user: dict = Depends(get_current_user)):
+    """Disconnect Outlook"""
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"outlook_calendar_connected": False}}
+    )
+    return {"message": "Outlook Calendar disconnected"}
+
+@api_router.post("/calendar/apple/connect")
+async def apple_calendar_connect(user: dict = Depends(get_current_user)):
+    """Mock Apple connection"""
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"apple_calendar_connected": True}}
+    )
+    return {"message": "Apple Calendar connected (mock)"}
+
+@api_router.post("/calendar/apple/disconnect")
+async def apple_calendar_disconnect(user: dict = Depends(get_current_user)):
+    """Disconnect Apple"""
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"apple_calendar_connected": False}}
+    )
+    return {"message": "Apple Calendar disconnected"}
 
 @api_router.get("/calendar/google/events")
 async def get_google_calendar_events(
@@ -1443,16 +1483,7 @@ async def test_email(user: dict = Depends(get_current_user)):
 async def root():
     return {"message": "DeeMeet API", "version": "1.1.0", "features": ["calendar_sync", "email_notifications"]}
 
-# Include router
-app.include_router(api_router)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # =====================
 # ADMIN PANEL ENDPOINTS
@@ -1548,11 +1579,11 @@ async def get_admin_users(
             }
         
         total = await db.users.count_documents(query)
-        users = await db.users.find(query, {"password_hash": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(length=limit)
+        users = await db.users.find(query, {"password_hash": 0, "_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(length=limit)
         
         # Add booking count for each user
         for user in users:
-            user["booking_count"] = await db.appointments.count_documents({"user_id": user["user_id"]})
+            user["booking_count"] = await db.appointments.count_documents({"host_user_id": user["user_id"]})
             user["booking_types_count"] = await db.booking_types.count_documents({"user_id": user["user_id"]})
         
         return {
@@ -1711,6 +1742,17 @@ async def update_user_plan(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# Include router after all routes are defined
+app.include_router(api_router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.exception_handler(pymongo.errors.ServerSelectionTimeoutError)
 async def mongo_connection_handler(request: Request, exc: pymongo.errors.ServerSelectionTimeoutError):

@@ -21,6 +21,7 @@ const DashboardLayout = ({ children }) => {
     { icon: Clock, label: "Availability", path: "/availability" },
     { icon: Users, label: "Bookings", path: "/bookings" },
     { icon: Sparkles, label: "AI Assistant", path: "/ai-assistant" },
+    { icon: Zap, label: "Integrations", path: "/integrations" },
     { icon: User, label: "Profile", path: "/profile" },
   ];
 

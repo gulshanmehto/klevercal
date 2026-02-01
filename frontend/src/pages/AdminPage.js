@@ -42,14 +42,26 @@ const AdminPage = () => {
         setLoading(false);
     };
 
+    const handleApiResponse = async (response) => {
+        if (response.status === 401 || response.status === 403) {
+            localStorage.removeItem("klevercal_token");
+            localStorage.removeItem("klevercal_user");
+            toast.error("Session expired or unauthorized. Please login again.");
+            navigate("/administrator-login");
+            return false;
+        }
+        return response.ok;
+    };
+
     const fetchStats = async () => {
         try {
             const response = await fetch(`${API}/admin/stats`, { headers: getAuthHeaders() });
-            if (response.ok) {
+            if (await handleApiResponse(response)) {
                 const data = await response.json();
                 setStats(data);
-            } else {
-                toast.error("Failed to load admin stats");
+            } else if (response.ok) { // Should not happen if handleApiResponse returns false for non-ok
+                const data = await response.json();
+                setStats(data);
             }
         } catch (error) {
             toast.error("Error loading stats");
@@ -61,7 +73,7 @@ const AdminPage = () => {
             const skip = (currentPage - 1) * 50;
             const searchParam = searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : "";
             const response = await fetch(`${API}/admin/users?skip=${skip}&limit=50${searchParam}`, { headers: getAuthHeaders() });
-            if (response.ok) {
+            if (await handleApiResponse(response)) {
                 const data = await response.json();
                 setUsers(data.users || []);
                 setUsersTotal(data.total || 0);
@@ -76,8 +88,8 @@ const AdminPage = () => {
             const demoResponse = await fetch(`${API}/admin/analytics/demographics`, { headers: getAuthHeaders() });
             const growthResponse = await fetch(`${API}/admin/analytics/growth`, { headers: getAuthHeaders() });
 
-            if (demoResponse.ok) setDemographics(await demoResponse.json());
-            if (growthResponse.ok) setGrowthData(await growthResponse.json());
+            if (await handleApiResponse(demoResponse)) setDemographics(await demoResponse.json());
+            if (await handleApiResponse(growthResponse)) setGrowthData(await growthResponse.json());
         } catch (error) {
             toast.error("Error loading analytics");
         }
@@ -86,7 +98,7 @@ const AdminPage = () => {
     const fetchCoupons = async () => {
         try {
             const response = await fetch(`${API}/admin/coupons`, { headers: getAuthHeaders() });
-            if (response.ok) {
+            if (await handleApiResponse(response)) {
                 const data = await response.json();
                 setCoupons(data.coupons || []);
             }
@@ -155,7 +167,7 @@ const AdminPage = () => {
         localStorage.removeItem("klevercal_token");
         localStorage.removeItem("klevercal_user");
         toast.success("Logged out successfully");
-        navigate("/administrator-login");
+        navigate("/administrator-login", { replace: true });
     };
 
     if (loading) {

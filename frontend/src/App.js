@@ -18,6 +18,7 @@ import OnboardingPage from "./pages/OnboardingPage";
 import AIAssistantPage from "./pages/AIAssistantPage";
 import AdminPage from "./pages/AdminPage";
 import AdminLoginPage from "./pages/AdminLoginPage";
+import IntegrationsPage from "./pages/IntegrationsPage";
 
 // Auth context
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -122,6 +123,14 @@ const AppRouter = () => {
         element={
           <ProtectedRoute>
             <AIAssistantPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/integrations"
+        element={
+          <ProtectedRoute>
+            <IntegrationsPage />
           </ProtectedRoute>
         }
       />
