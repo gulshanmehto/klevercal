@@ -1320,20 +1320,21 @@ Form Responses: {data.answers}"""
 async def update_profile(request: Request, user: dict = Depends(get_current_user)):
     body = await request.json()
     allowed_fields = [
-        "name", "brand_color", "timezone", "picture", 
+        "name", "brand_color", "timezone", "picture", "logo_url",
         "welcome_message", "language", "date_format", 
         "time_format", "country", "use_branding", "slug"
     ]
     update_data = {k: v for k, v in body.items() if k in allowed_fields}
     
     if "slug" in update_data:
-        # Check if slug is unique
-        existing = await db.users.find_one({
-            "slug": update_data["slug"], 
-            "user_id": {"$ne": user["user_id"]}
-        })
-        if existing:
-            raise HTTPException(status_code=400, detail="This link is already taken. Please try another one.")
+        # Only check if slug is unique if it's being changed
+        if update_data["slug"] != user.get("slug"):
+            existing = await db.users.find_one({
+                "slug": update_data["slug"], 
+                "user_id": {"$ne": user["user_id"]}
+            })
+            if existing:
+                raise HTTPException(status_code=400, detail="This link is already taken. Please try another one.")
     
     if update_data:
         await db.users.update_one({"user_id": user["user_id"]}, {"$set": update_data})
