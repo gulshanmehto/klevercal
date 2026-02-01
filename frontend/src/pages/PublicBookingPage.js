@@ -6,7 +6,7 @@ import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { Card, CardContent } from "../components/ui/card";
 import { Calendar } from "../components/ui/calendar";
-import { Calendar as CalendarIcon, Clock, User, Mail, CheckCircle2, ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, User, Mail, CheckCircle2, ArrowLeft, ArrowRight, Loader2, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { format, addDays, isSameDay } from "date-fns";
 import { API_URL as API } from "../config";
@@ -274,6 +274,19 @@ const PublicBookingPage = () => {
               <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 mb-4">
                 <Clock className="w-5 h-5" />
                 {bookingType.duration} minutes
+              </div>
+
+              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 mb-4">
+                <MapPin className="w-5 h-5" />
+                {(() => {
+                  switch (bookingType.location_type) {
+                    case 'google_meet': return 'Google Meet';
+                    case 'zoom': return 'Zoom';
+                    case 'teams': return 'Microsoft Teams';
+                    case 'custom': return bookingType.location_details || 'Custom Location';
+                    default: return 'Google Meet';
+                  }
+                })()}
               </div>
 
               {bookingType.description && (

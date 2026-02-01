@@ -29,7 +29,10 @@ const MeetingTypesPage = () => {
     buffer_after: 15,
     min_notice: 60,
     max_bookings_per_day: null,
-    questions: []
+    max_bookings_per_day: null,
+    questions: [],
+    location_type: "google_meet",
+    location_details: ""
   });
   const [saving, setSaving] = useState(false);
 
@@ -117,7 +120,10 @@ const MeetingTypesPage = () => {
       buffer_after: 15,
       min_notice: 60,
       max_bookings_per_day: null,
-      questions: []
+      max_bookings_per_day: null,
+      questions: [],
+      location_type: "google_meet",
+      location_details: ""
     });
     setEditingType(null);
   };
@@ -134,7 +140,10 @@ const MeetingTypesPage = () => {
       buffer_after: type.buffer_after,
       min_notice: type.min_notice,
       max_bookings_per_day: type.max_bookings_per_day,
-      questions: type.questions || []
+      max_bookings_per_day: type.max_bookings_per_day,
+      questions: type.questions || [],
+      location_type: type.location_type || "google_meet",
+      location_details: type.location_details || ""
     });
     setDialogOpen(true);
   };
@@ -199,9 +208,38 @@ const MeetingTypesPage = () => {
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     placeholder="A quick call to discuss..."
                     rows={3}
-                    data-testid="meeting-type-description-input"
                   />
                 </div>
+
+                <div className="space-y-2">
+                  <Label>Location</Label>
+                  <Select
+                    value={formData.location_type}
+                    onValueChange={(v) => setFormData({ ...formData, location_type: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="google_meet">Google Meet</SelectItem>
+                      <SelectItem value="zoom">Zoom</SelectItem>
+                      <SelectItem value="teams">Microsoft Teams</SelectItem>
+                      <SelectItem value="custom">Custom Text</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {formData.location_type === "custom" && (
+                  <div className="space-y-2">
+                    <Label>Location Details</Label>
+                    <Input
+                      value={formData.location_details}
+                      onChange={(e) => setFormData({ ...formData, location_details: e.target.value })}
+                      placeholder="e.g. Phone call to +1 555..."
+                      required
+                    />
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">

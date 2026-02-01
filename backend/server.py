@@ -110,6 +110,8 @@ class BookingTypeCreate(BaseModel):
     min_notice: int = 60
     max_bookings_per_day: Optional[int] = None
     questions: List[Dict[str, Any]] = []
+    location_type: str = "google_meet"  # google_meet, zoom, teams, custom
+    location_details: Optional[str] = ""
 
 class BookingTypeResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -125,6 +127,8 @@ class BookingTypeResponse(BaseModel):
     min_notice: int
     max_bookings_per_day: Optional[int]
     questions: List[Dict[str, Any]]
+    location_type: str
+    location_details: Optional[str]
     slug: str
     created_at: datetime
 
@@ -201,7 +205,9 @@ def send_booking_confirmation_email(
     start_time: datetime,
     end_time: datetime,
     duration: int,
-    notes: str = ""
+    notes: str = "",
+    location: str = "Google Meet",
+    meeting_link: Optional[str] = None
 ):
     """Send booking confirmation email via Gmail SMTP"""
     if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
@@ -258,6 +264,11 @@ def send_booking_confirmation_email(
                             <span class="detail-value">{duration} minutes</span>
                         </div>
                         {f'<div class="detail-row"><span class="detail-label">📝 Notes:</span><span class="detail-value">{notes}</span></div>' if notes else ''}
+                        <div class="detail-row">
+                            <span class="detail-label">📍 Location:</span>
+                            <span class="detail-value">{location}</span>
+                        </div>
+                        {f'<div style="text-align: center; margin-top: 25px;"><a href="{meeting_link}" class="btn">🎥 Join Meeting</a></div>' if meeting_link else ''}
                     </div>
                     
                     <p>A calendar invite will be sent separately. Please add this to your calendar.</p>
@@ -286,6 +297,8 @@ Meeting: {meeting_title}
 Date: {date_str}
 Time: {time_str}
 Duration: {duration} minutes
+Location: {location}
+{f'Meeting Link: {meeting_link}' if meeting_link else ''}
 {f'Notes: {notes}' if notes else ''}
 
 A calendar invite will be sent separately.
@@ -325,7 +338,9 @@ def send_host_notification_email(
     start_time: datetime,
     end_time: datetime,
     notes: str = "",
-    guest_phone: Optional[str] = None
+    guest_phone: Optional[str] = None,
+    location: str = "Google Meet",
+    meeting_link: Optional[str] = None
 ):
     """Send notification email to host about new booking"""
     if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
@@ -367,6 +382,8 @@ def send_host_notification_email(
                         {phone_html}
                         <p><strong>Date:</strong> {date_str}</p>
                         <p><strong>Time:</strong> {time_str}</p>
+                        <p><strong>Location:</strong> {location}</p>
+                        {f'<p><strong>Meeting Link:</strong> <a href="{meeting_link}">{meeting_link}</a></p>' if meeting_link else ''}
                         {f'<p><strong>Notes:</strong> {notes}</p>' if notes else ''}
                     </div>
                 </div>
@@ -453,9 +470,10 @@ async def create_google_calendar_event(
     description: str,
     start_time: datetime,
     end_time: datetime,
-    attendee_email: str
-) -> Optional[str]:
-    """Create a Google Calendar event and return the event ID"""
+    attendee_email: str,
+    location_type: str = "google_meet"
+) -> Optional[Dict[str, str]]:
+    """Create a Google Calendar event and return the event ID and meeting link"""
     creds = await get_google_credentials(user_id)
     if not creds:
         return None
@@ -485,15 +503,32 @@ async def create_google_calendar_event(
                 ],
             },
         }
+
+        # Add logic for Google Meet
+        if location_type == "google_meet":
+            event['conferenceData'] = {
+                'createRequest': {
+                    'requestId': f"req-{uuid.uuid4().hex}",
+                    'conferenceSolutionKey': {'type': 'hangoutsMeet'}
+                }
+            }
         
         event = service.events().insert(
             calendarId='primary',
             body=event,
-            sendUpdates='all'
+            sendUpdates='all',
+            conferenceDataVersion=1
         ).execute()
         
-        logger.info(f"Created Google Calendar event: {event.get('id')}")
-        return event.get('id')
+        event_id = event.get('id')
+        hangout_link = event.get('hangoutLink')
+        
+        logger.info(f"Created Google Calendar event: {event_id}, Link: {hangout_link}")
+        
+        return {
+            "id": event_id,
+            "meeting_link": hangout_link
+        }
         
     except Exception as e:
         logger.error(f"Failed to create Google Calendar event: {e}")
@@ -920,6 +955,8 @@ async def create_booking_type(data: BookingTypeCreate, user: dict = Depends(get_
         "min_notice": data.min_notice,
         "max_bookings_per_day": data.max_bookings_per_day,
         "questions": data.questions,
+        "location_type": data.location_type,
+        "location_details": data.location_details,
         "slug": slug,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
@@ -941,7 +978,8 @@ async def get_booking_type(booking_type_id: str, user: dict = Depends(get_curren
 
 @api_router.put("/booking-types/{booking_type_id}", response_model=BookingTypeResponse)
 async def update_booking_type(booking_type_id: str, data: BookingTypeCreate, user: dict = Depends(get_current_user)):
-    update_data = data.model_dump()
+    # Update fields
+    update_data = data.model_dump(exclude_unset=True)
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     
     result = await db.booking_types.update_one(
@@ -1178,15 +1216,31 @@ async def create_appointment(data: AppointmentCreate):
     
     # Create Google Calendar event if connected
     google_event_id = None
+    meeting_link = None
+    
+    # Get location details
+    location_type = bt.get("location_type", "google_meet")
+    location_label = "Google Meet"
+    if location_type == "zoom":
+        location_label = "Zoom"
+    elif location_type == "teams":
+        location_label = "Microsoft Teams"
+    elif location_type == "custom":
+        location_label = bt.get("location_details", "Custom Location")
+
     if host.get("google_calendar_connected"):
-        google_event_id = await create_google_calendar_event(
+        google_data = await create_google_calendar_event(
             user_id=data.host_user_id,
             summary=f"{bt['title']} with {data.guest_name}",
             description=f"Guest: {data.guest_name}\nEmail: {data.guest_email}\nPhone: {data.guest_phone or 'N/A'}\nNotes: {data.notes or 'None'}",
             start_time=data.start_time,
             end_time=end_time,
-            attendee_email=data.guest_email
+            attendee_email=data.guest_email,
+            location_type=location_type
         )
+        if google_data:
+            google_event_id = google_data.get("id")
+            meeting_link = google_data.get("meeting_link")
     
     doc = {
         "appointment_id": appointment_id,
@@ -1202,6 +1256,8 @@ async def create_appointment(data: AppointmentCreate):
         "answers": data.answers,
         "lead_score": None,
         "google_event_id": google_event_id,
+        "meeting_link": meeting_link,
+        "location": location_label,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.appointments.insert_one(doc)
@@ -1215,7 +1271,9 @@ async def create_appointment(data: AppointmentCreate):
         start_time=data.start_time,
         end_time=end_time,
         duration=bt["duration"],
-        notes=data.notes or ""
+        notes=data.notes or "",
+        location=location_label,
+        meeting_link=meeting_link
     )
     
     send_host_notification_email(
@@ -1227,7 +1285,9 @@ async def create_appointment(data: AppointmentCreate):
         meeting_title=bt["title"],
         start_time=data.start_time,
         end_time=end_time,
-        notes=data.notes or ""
+        notes=data.notes or "",
+        location=location_label,
+        meeting_link=meeting_link
     )
     
     return AppointmentResponse(**{
