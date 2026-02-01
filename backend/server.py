@@ -692,7 +692,6 @@ async def logout(request: Request, response: Response):
 @api_router.get("/calendar/google/connect")
 async def google_calendar_connect(request: Request, user: dict = Depends(get_current_user)):
     """Initiate Google Calendar OAuth flow"""
-    # Get the frontend URL from the request origin
     origin = request.headers.get("origin", "")
     if not origin:
         referer = request.headers.get("referer", "")
@@ -700,6 +699,12 @@ async def google_calendar_connect(request: Request, user: dict = Depends(get_cur
             from urllib.parse import urlparse
             parsed = urlparse(referer)
             origin = f"{parsed.scheme}://{parsed.netloc}"
+            
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=400, 
+            detail="Google Calendar integration is not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in the environment."
+        )
     
     redirect_uri = f"{origin}/api/calendar/google/callback"
     
