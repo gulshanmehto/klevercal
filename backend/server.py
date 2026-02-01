@@ -954,6 +954,30 @@ async def get_public_user(user_id: str):
         "slug": user.get("slug")
     }
 
+@api_router.get("/public/profile/{slug}")
+async def get_public_profile_by_slug(slug: str):
+    """Get public profile (user info + booking types) by slug"""
+    user = await db.users.find_one({"slug": slug}, {"_id": 0, "password_hash": 0, "google_tokens": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get active booking types
+    booking_types = await db.booking_types.find({"user_id": user["user_id"], "is_active": True}, {"_id": 0}).to_list(100)
+    
+    return {
+        "user": {
+            "user_id": user["user_id"], 
+            "name": user["name"], 
+            "picture": user.get("picture"), 
+            "brand_color": user.get("brand_color", "#7c3aed"),
+            "welcome_message": user.get("welcome_message"),
+            "logo_url": user.get("logo_url"),
+            "use_branding": user.get("use_branding", True),
+            "slug": user.get("slug")
+        },
+        "booking_types": booking_types
+    }
+
 @api_router.get("/public/booking-types/{user_id}")
 async def get_public_booking_types(user_id: str):
     types = await db.booking_types.find({"user_id": user_id, "is_active": True}, {"_id": 0}).to_list(100)

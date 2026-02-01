@@ -13,6 +13,7 @@ import AvailabilityPage from "./pages/AvailabilityPage";
 import BookingsPage from "./pages/BookingsPage";
 import ProfilePage from "./pages/ProfilePage";
 import PublicBookingPage from "./pages/PublicBookingPage";
+import PublicProfilePage from "./pages/PublicProfilePage";
 import AIAssistantPage from "./pages/AIAssistantPage";
 
 // Auth context
@@ -114,6 +115,8 @@ const AppRouter = () => {
         }
       />
       <Route path="/book/:slug" element={<PublicBookingPage />} />
+      {/* Public Profile Route - Placed last to avoid conflicts */}
+      <Route path="/:slug" element={<PublicProfilePage />} />
     </Routes>
   );
 };
