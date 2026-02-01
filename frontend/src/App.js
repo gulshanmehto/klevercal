@@ -14,6 +14,7 @@ import BookingsPage from "./pages/BookingsPage";
 import ProfilePage from "./pages/ProfilePage";
 import PublicBookingPage from "./pages/PublicBookingPage";
 import PublicProfilePage from "./pages/PublicProfilePage";
+import OnboardingPage from "./pages/OnboardingPage";
 import AIAssistantPage from "./pages/AIAssistantPage";
 
 // Auth context
@@ -66,6 +67,14 @@ const AppRouter = () => {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
+      <Route
+        path="/onboarding"
+        element={
+          <ProtectedRoute>
+            <OnboardingPage />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/dashboard"
         element={
