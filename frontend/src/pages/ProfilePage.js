@@ -137,11 +137,6 @@ const ProfilePage = () => {
             </nav>
           </div>
 
-          <div className="pt-8 border-t border-slate-100 dark:border-slate-800 space-y-1">
-            <Button variant="ghost" className="w-full justify-start text-slate-500 hover:text-slate-900 px-4">Login preferences</Button>
-            <Button variant="ghost" className="w-full justify-start text-slate-500 hover:text-slate-900 px-4">Security</Button>
-            <Button variant="ghost" className="w-full justify-start text-slate-500 hover:text-slate-900 px-4">Cookie settings</Button>
-          </div>
         </aside>
 
         {/* Main Content Area */}
@@ -167,16 +162,6 @@ const ProfilePage = () => {
                         </span>
                       )}
                     </div>
-                    <button className="absolute inset-0 bg-black/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 rounded-full transition-opacity">
-                      <Camera className="w-6 h-6" />
-                    </button>
-                  </div>
-                  <div className="flex gap-3">
-                    <Button variant="outline" className="rounded-full px-6">Update</Button>
-                    <Button variant="ghost" className="rounded-full text-slate-500 hover:text-rose-600">
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Remove
-                    </Button>
                   </div>
                 </div>
 
@@ -294,9 +279,7 @@ const ProfilePage = () => {
                   </div>
 
                   <div className="w-full h-48 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center bg-white dark:bg-slate-900/50">
-                    <span className="text-slate-400 font-medium text-lg mb-4">No Logo</span>
-                    <Button variant="outline" className="rounded-full px-8">Upload image</Button>
-                    <p className="text-xs text-slate-400 mt-4">JPG, GIF or PNG. Max size of 5MB.</p>
+                    <span className="text-slate-400 font-medium text-lg">No Logo</span>
                   </div>
                 </section>
 
