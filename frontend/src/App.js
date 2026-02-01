@@ -16,6 +16,7 @@ import PublicBookingPage from "./pages/PublicBookingPage";
 import PublicProfilePage from "./pages/PublicProfilePage";
 import OnboardingPage from "./pages/OnboardingPage";
 import AIAssistantPage from "./pages/AIAssistantPage";
+import AdminPage from "./pages/AdminPage";
 
 // Auth context
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -120,6 +121,14 @@ const AppRouter = () => {
         element={
           <ProtectedRoute>
             <AIAssistantPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            <AdminPage />
           </ProtectedRoute>
         }
       />

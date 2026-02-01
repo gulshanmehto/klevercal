@@ -1454,6 +1454,264 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# =====================
+# ADMIN PANEL ENDPOINTS
+# =====================
+
+# Admin authentication helper
+ADMIN_EMAILS = os.environ.get('ADMIN_EMAILS', 'admin@deemeet.com').split(',')
+
+async def get_admin_user(user: dict = Depends(get_current_user)):
+    if user.get('email') not in ADMIN_EMAILS:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
+@api_router.get("/admin/stats", response_model=dict)
+async def get_admin_stats(admin: dict = Depends(get_admin_user)):
+    """Get comprehensive admin dashboard statistics"""
+    try:
+        # Total users
+        total_users = await db.users.count_documents({})
+        
+        # Users with completed onboarding (have slug)
+        onboarded_users = await db.users.count_documents({"slug": {"$ne": None, "$exists": True}})
+        
+        # Users by plan
+        free_plan = await db.users.count_documents({"plan": {"$in": [None, "free"]}})
+        pro_plan = await db.users.count_documents({"plan": "pro"})
+        premium_plan = await db.users.count_documents({"plan": "premium"})
+        
+        # Total bookings
+        total_bookings = await db.appointments.count_documents({})
+        
+        # Bookings this month
+        now = datetime.now(timezone.utc)
+        first_day_of_month = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+        bookings_this_month = await db.appointments.count_documents({
+            "created_at": {"$gte": first_day_of_month.isoformat()}
+        })
+        
+        # Active booking types
+        active_booking_types = await db.booking_types.count_documents({})
+        
+        # Revenue (if you add subscription tracking)
+        total_revenue = pro_plan * 10 + premium_plan * 20  # Example calculation
+        
+        # New users this week
+        week_ago = now - timedelta(days=7)
+        new_users_this_week = await db.users.count_documents({
+            "created_at": {"$gte": week_ago.isoformat()}
+        })
+        
+        return {
+            "total_users": total_users,
+            "onboarded_users": onboarded_users,
+            "pending_onboarding": total_users - onboarded_users,
+            "plans": {
+                "free": free_plan,
+                "pro": pro_plan,
+                "premium": premium_plan
+            },
+            "bookings": {
+                "total": total_bookings,
+                "this_month": bookings_this_month
+            },
+            "active_booking_types": active_booking_types,
+            "revenue": {
+                "estimated_monthly": total_revenue,
+                "currency": "USD"
+            },
+            "growth": {
+                "new_users_this_week": new_users_this_week
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/admin/users", response_model=dict)
+async def get_admin_users(
+    admin: dict = Depends(get_admin_user),
+    skip: int = 0,
+    limit: int = 50,
+    search: Optional[str] = None
+):
+    """Get paginated list of all users with their details"""
+    try:
+        query = {}
+        if search:
+            query = {
+                "$or": [
+                    {"email": {"$regex": search, "$options": "i"}},
+                    {"name": {"$regex": search, "$options": "i"}},
+                    {"slug": {"$regex": search, "$options": "i"}}
+                ]
+            }
+        
+        total = await db.users.count_documents(query)
+        users = await db.users.find(query, {"password_hash": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(length=limit)
+        
+        # Add booking count for each user
+        for user in users:
+            user["booking_count"] = await db.appointments.count_documents({"user_id": user["user_id"]})
+            user["booking_types_count"] = await db.booking_types.count_documents({"user_id": user["user_id"]})
+        
+        return {
+            "total": total,
+            "users": users,
+            "page": skip // limit + 1,
+            "per_page": limit
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/admin/analytics/demographics", response_model=dict)
+async def get_demographics(admin: dict = Depends(get_admin_user)):
+    """Get user demographics"""
+    try:
+        # Users by country
+        country_pipeline = [
+            {"$group": {"_id": "$country", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+            {"$limit": 10}
+        ]
+        countries = await db.users.aggregate(country_pipeline).to_list(length=10)
+        
+        # Users by timezone
+        timezone_pipeline = [
+            {"$group": {"_id": "$timezone", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+            {"$limit": 10}
+        ]
+        timezones = await db.users.aggregate(timezone_pipeline).to_list(length=10)
+        
+        # Users by language
+        language_pipeline = [
+            {"$group": {"_id": "$language", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}}
+        ]
+        languages = await db.users.aggregate(language_pipeline).to_list(length=10)
+        
+        return {
+            "countries": [{"country": item["_id"], "count": item["count"]} for item in countries],
+            "timezones": [{"timezone": item["_id"], "count": item["count"]} for item in timezones],
+            "languages": [{"language": item["_id"], "count": item["count"]} for item in languages]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/admin/analytics/growth", response_model=dict)
+async def get_growth_analytics(admin: dict = Depends(get_admin_user)):
+    """Get user growth over time"""
+    try:
+        # Get user signups by day for last 30 days
+        now = datetime.now(timezone.utc)
+        days_ago_30 = now - timedelta(days=30)
+        
+        pipeline = [
+            {
+                "$match": {
+                    "created_at": {"$gte": days_ago_30.isoformat()}
+                }
+            },
+            {
+                "$group": {
+                    "_id": {
+                        "$dateToString": {
+                            "$dateFromString": {"dateString": "$created_at"},
+                            "format": "%Y-%m-%d"
+                        }
+                    },
+                    "count": {"$sum": 1}
+                }
+            },
+            {"$sort": {"_id": 1}}
+        ]
+        
+        daily_signups = await db.users.aggregate(pipeline).to_list(length=30)
+        
+        return {
+            "daily_signups": [{"date": item["_id"], "count": item["count"]} for item in daily_signups]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/admin/coupons", response_model=dict)
+async def create_coupon(
+    code: str,
+    discount_percent: int,
+    max_uses: Optional[int] = None,
+    expires_at: Optional[str] = None,
+    plan_restriction: Optional[str] = None,
+    admin: dict = Depends(get_admin_user)
+):
+    """Create a new coupon code"""
+    try:
+        existing = await db.coupons.find_one({"code": code.upper()})
+        if existing:
+            raise HTTPException(status_code=400, detail="Coupon code already exists")
+        
+        coupon_doc = {
+            "coupon_id": f"coupon_{uuid.uuid4().hex[:12]}",
+            "code": code.upper(),
+            "discount_percent": discount_percent,
+            "max_uses": max_uses,
+            "current_uses": 0,
+            "expires_at": expires_at,
+            "plan_restriction": plan_restriction,
+            "is_active": True,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_by": admin["user_id"]
+        }
+        
+        await db.coupons.insert_one(coupon_doc)
+        return {"message": "Coupon created successfully", "coupon": coupon_doc}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/admin/coupons", response_model=dict)
+async def get_coupons(admin: dict = Depends(get_admin_user)):
+    """Get all coupons"""
+    try:
+        coupons = await db.coupons.find({}, {"_id": 0}).sort("created_at", -1).to_list(length=100)
+        return {"coupons": coupons}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.delete("/admin/coupons/{coupon_id}")
+async def delete_coupon(coupon_id: str, admin: dict = Depends(get_admin_user)):
+    """Delete a coupon"""
+    try:
+        result = await db.coupons.delete_one({"coupon_id": coupon_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Coupon not found")
+        return {"message": "Coupon deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.put("/admin/users/{user_id}/plan")
+async def update_user_plan(
+    user_id: str,
+    plan: str,
+    admin: dict = Depends(get_admin_user)
+):
+    """Update a user's plan"""
+    try:
+        result = await db.users.update_one(
+            {"user_id": user_id},
+            {"$set": {"plan": plan, "updated_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+        return {"message": "User plan updated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.exception_handler(pymongo.errors.ServerSelectionTimeoutError)
 async def mongo_connection_handler(request: Request, exc: pymongo.errors.ServerSelectionTimeoutError):
     return Response(
