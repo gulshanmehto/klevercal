@@ -39,9 +39,7 @@ const SignupPage = () => {
       {/* Left side - Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-violet-600 to-indigo-600 p-12 flex-col justify-between">
         <Link to="/" className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-            <Calendar className="w-6 h-6 text-white" />
-          </div>
+          <img src="/logo.png" alt="DeeMeet" className="w-10 h-10 object-contain" />
           <span className="font-bold text-2xl text-white">DeeMeet</span>
         </Link>
         <div className="space-y-6">
@@ -74,9 +72,7 @@ const SignupPage = () => {
         <Card className="w-full max-w-md bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-xl rounded-2xl">
           <CardHeader className="space-y-2 pb-6">
             <div className="lg:hidden flex items-center gap-2 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-white" />
-              </div>
+              <img src="/logo.png" alt="DeeMeet" className="w-9 h-9 object-contain" />
               <span className="font-bold text-xl text-slate-900 dark:text-white">DeeMeet</span>
             </div>
             <CardTitle className="text-2xl font-bold text-slate-900 dark:text-white">Create your account</CardTitle>

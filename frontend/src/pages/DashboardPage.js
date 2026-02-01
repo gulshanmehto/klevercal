@@ -35,9 +35,7 @@ const DashboardLayout = ({ children }) => {
       <aside className="fixed left-0 top-0 bottom-0 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 z-40">
         <div className="p-6">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-white" />
-            </div>
+            <img src="/logo.png" alt="DeeMeet" className="w-9 h-9 object-contain" />
             <span className="font-bold text-xl text-slate-900 dark:text-white">DeeMeet</span>
           </Link>
         </div>
@@ -50,8 +48,8 @@ const DashboardLayout = ({ children }) => {
                 key={item.path}
                 to={item.path}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${isActive
-                    ? "bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300"
-                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  ? "bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300"
+                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                   }`}
                 data-testid={`nav-${item.label.toLowerCase().replace(" ", "-")}`}
               >
@@ -115,9 +113,9 @@ const DashboardPage = () => {
       const headers = { ...getAuthHeaders(), "Content-Type": "application/json" };
 
       const [statsRes, typesRes, appointmentsRes] = await Promise.all([
-        fetch(`${API}/dashboard/stats`, { headers,  }),
-        fetch(`${API}/booking-types`, { headers,  }),
-        fetch(`${API}/appointments?status=confirmed`, { headers,  })
+        fetch(`${API}/dashboard/stats`, { headers, }),
+        fetch(`${API}/booking-types`, { headers, }),
+        fetch(`${API}/appointments?status=confirmed`, { headers, })
       ]);
 
       if (statsRes.ok) {
