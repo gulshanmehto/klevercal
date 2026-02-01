@@ -90,14 +90,31 @@ const ProfilePage = () => {
           setFormData(prev => ({ ...prev, logo_url: imageUrl }));
         }
         toast.success("Image uploaded successfully");
-        // Also update the user profile so it persists
-        await handleUpdate();
+        // Save image to profile without updating slug
+        await handleImageUpdate(imageUrl, type);
       } else {
         toast.error("Failed to upload image");
       }
     } catch (error) {
       console.error("Upload error:", error);
       toast.error("Error uploading image");
+    }
+  };
+
+  const handleImageUpdate = async (imageUrl, type) => {
+    try {
+      const updateData = type === "picture" ? { picture: imageUrl } : { logo_url: imageUrl };
+      const response = await fetch(`${API}/profile`, {
+        method: "PUT",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify(updateData)
+      });
+
+      if (response.ok) {
+        checkAuth();
+      }
+    } catch (error) {
+      console.error("Failed to save image:", error);
     }
   };
 
@@ -401,8 +418,30 @@ const ProfilePage = () => {
                   </div>
                 </div>
 
+                {user?.slug && (
+                  <div className="space-y-3">
+                    <Label className="text-slate-700 dark:text-slate-300 font-semibold">Your Current Link</Label>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3">
+                        <div className="text-violet-600 dark:text-violet-400 font-medium">https://deemeet.in/{user.slug}</div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        className="rounded-xl h-12 px-6"
+                        onClick={() => {
+                          navigator.clipboard.writeText(`https://deemeet.in/${user.slug}`);
+                          toast.success("Link copied to clipboard!");
+                        }}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+                        Copy
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-4">
-                  <Label className="text-slate-700 dark:text-slate-300 font-semibold">Your Link</Label>
+                  <Label className="text-slate-700 dark:text-slate-300 font-semibold">Change Your Link</Label>
                   <div className="flex items-center gap-3">
                     <div className="bg-slate-100 dark:bg-slate-800 px-4 h-12 rounded-xl flex items-center text-slate-500 font-medium">deemeet.in/</div>
                     <Input
