@@ -40,7 +40,7 @@ const LoginPage = () => {
       {/* Left side - Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-violet-600 to-indigo-600 p-12 flex-col justify-between">
         <Link to="/" className="flex items-center gap-3">
-          <img src="/logo.png" alt="DeeMeet" className="h-10 w-auto object-contain" />
+          <img src="/logo-dark.png" alt="DeeMeet" className="h-10 w-auto object-contain" />
         </Link>
         <div className="space-y-6">
           <h1 className="text-4xl font-bold text-white leading-tight">
@@ -60,7 +60,7 @@ const LoginPage = () => {
         <Card className="w-full max-w-md bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-xl rounded-2xl">
           <CardHeader className="space-y-2 pb-6">
             <div className="lg:hidden flex items-center gap-2 mb-4">
-              <img src="/logo.png" alt="DeeMeet" className="h-10 w-auto object-contain" />
+              <img src="/logo-dark.png" alt="DeeMeet" className="h-10 w-auto object-contain" />
             </div>
             <CardTitle className="text-2xl font-bold text-slate-900 dark:text-white">Sign in</CardTitle>
             <CardDescription className="text-slate-600 dark:text-slate-400">
