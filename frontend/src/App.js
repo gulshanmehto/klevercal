@@ -17,6 +17,7 @@ import PublicProfilePage from "./pages/PublicProfilePage";
 import OnboardingPage from "./pages/OnboardingPage";
 import AIAssistantPage from "./pages/AIAssistantPage";
 import AdminPage from "./pages/AdminPage";
+import AdminLoginPage from "./pages/AdminLoginPage";
 
 // Auth context
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -124,14 +125,8 @@ const AppRouter = () => {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/admin"
-        element={
-          <ProtectedRoute>
-            <AdminPage />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/administrator-login" element={<AdminLoginPage />} />
+      <Route path="/admin" element={<AdminPage />} />
       <Route path="/book/:slug" element={<PublicBookingPage />} />
       {/* Public Profile Route - Placed last to avoid conflicts */}
       <Route path="/:slug" element={<PublicProfilePage />} />
