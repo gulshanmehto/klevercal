@@ -65,7 +65,7 @@ const ProfilePage = () => {
       const response = await fetch(`${API}/profile`, {
         method: "PUT",
         headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
-        ,
+
         body: JSON.stringify(formData)
       });
 

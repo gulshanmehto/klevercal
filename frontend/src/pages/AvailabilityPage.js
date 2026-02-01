@@ -41,7 +41,7 @@ const AvailabilityPage = () => {
     try {
       const response = await fetch(`${API}/availability`, {
         headers: getAuthHeaders(),
-        
+
       });
       if (response.ok) {
         const data = await response.json();
@@ -81,7 +81,7 @@ const AvailabilityPage = () => {
       const response = await fetch(`${API}/availability`, {
         method: "PUT",
         headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
-        ,
+
         body: JSON.stringify({ slots })
       });
 
@@ -142,8 +142,8 @@ const AvailabilityPage = () => {
                 <div
                   key={day.value}
                   className={`flex items-center gap-4 p-4 rounded-xl border ${availability[day.value]?.enabled
-                      ? "border-violet-200 bg-violet-50/50 dark:border-violet-800 dark:bg-violet-900/10"
-                      : "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/30"
+                    ? "border-violet-200 bg-violet-50/50 dark:border-violet-800 dark:bg-violet-900/10"
+                    : "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/30"
                     }`}
                   data-testid={`availability-day-${day.value}`}
                 >

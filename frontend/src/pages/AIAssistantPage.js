@@ -33,7 +33,7 @@ const AIAssistantPage = () => {
       const response = await fetch(`${API}/ai/parse-schedule`, {
         method: "POST",
         headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
-        ,
+
         body: JSON.stringify({ text: query })
       });
 
