@@ -1050,17 +1050,19 @@ async def zoom_connect(request: Request, user: dict = Depends(get_current_user))
     return {"authorization_url": authorization_url}
 
 @api_router.get("/calendar/zoom/callback")
-async def zoom_callback(code: str, state: str, request: Request):
+async def zoom_callback(code: str, request: Request, state: Optional[str] = None):
     """Handle Zoom OAuth callback"""
+    logger.info(f"Zoom callback received. Code: {code[:10]}..., State: {state}")
+    
+    if not state:
+        logger.warning("Zoom callback missing state parameter")
+        raise HTTPException(status_code=400, detail="Missing state parameter")
+
     state_record = await db.oauth_states.find_one({"state": state, "provider": "zoom"}, {"_id": 0})
-    # If using mock flow, state might not exist, but we expect real flow here if code is present
     
     # Validation
     if not state_record:
-         # It's possible the user cancelled or something went wrong? 
-         # Or used mock connect? If code is here, it's real.
          logger.warning(f"Zoom callback: invalid state {state}")
-         # Attempt to proceed? No, security risk.
          raise HTTPException(status_code=400, detail="Invalid state")
 
     user_id = state_record["user_id"]
