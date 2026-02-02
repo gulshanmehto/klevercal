@@ -66,7 +66,7 @@ SMTP_HOST = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
 SMTP_PORT = int(os.environ.get('SMTP_PORT', '465'))
 SMTP_USER = os.environ.get('SMTP_USER', os.environ.get('GMAIL_ADDRESS', ''))
 SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', os.environ.get('GMAIL_APP_PASSWORD', ''))
-SMTP_FROM_EMAIL = os.environ.get('SMTP_FROM_EMAIL', 'notifications@deemeet.in')
+SMTP_FROM_EMAIL = os.environ.get('SMTP_FROM_EMAIL', 'notifications@deemeet.app')
 SMTP_FROM_NAME = os.environ.get('SMTP_FROM_NAME', 'DeeMeet')
 
 # Legacy Gmail settings (for backward compatibility)
