@@ -81,6 +81,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+logger.info("🚀 DEEMEET BACKEND STARTING - VERSION: SMTP_PRO_V1")
 
 # ==================== MODELS ====================
 
