@@ -61,17 +61,13 @@ TEAMS_CLIENT_ID = os.environ.get('TEAMS_CLIENT_ID', '')
 TEAMS_CLIENT_SECRET = os.environ.get('TEAMS_CLIENT_SECRET', '')
 TEAMS_TENANT_ID = os.environ.get('TEAMS_TENANT_ID', 'common')
 
-# SMTP Email Settings (supports Gmail, SendGrid, Zoho, etc.)
-SMTP_HOST = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
-SMTP_PORT = int(os.environ.get('SMTP_PORT', '465'))
-SMTP_USER = os.environ.get('SMTP_USER', os.environ.get('GMAIL_ADDRESS', ''))
-SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', os.environ.get('GMAIL_APP_PASSWORD', ''))
-SMTP_FROM_EMAIL = os.environ.get('SMTP_FROM_EMAIL', 'notifications@deemeet.app')
+# SMTP Email Settings
+SMTP_HOST = os.environ.get('SMTP_HOST', '')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '587')) # Standard port fallback for safety
+SMTP_USER = os.environ.get('SMTP_USER', '')
+SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
+SMTP_FROM_EMAIL = os.environ.get('SMTP_FROM_EMAIL', '')
 SMTP_FROM_NAME = os.environ.get('SMTP_FROM_NAME', 'DeeMeet')
-
-# Legacy Gmail settings (for backward compatibility)
-GMAIL_ADDRESS = os.environ.get('GMAIL_ADDRESS', '')
-GMAIL_APP_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD', '')
 
 # Gemini Settings
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
@@ -234,8 +230,8 @@ def send_booking_confirmation_email(
     cancel_link: str = ""
 ):
     """Send booking confirmation email to guest using professional template"""
-    if not SMTP_USER or not SMTP_PASSWORD:
-        logger.warning("SMTP credentials not configured, skipping email")
+    if not all([SMTP_HOST, SMTP_USER, SMTP_PASSWORD, SMTP_FROM_EMAIL]):
+        logger.warning(f"SMTP configuration incomplete (Host: {bool(SMTP_HOST)}, User: {bool(SMTP_USER)}, Pass: {bool(SMTP_PASSWORD)}, From: {bool(SMTP_FROM_EMAIL)}), skipping email")
         return False
     
     try:
@@ -329,7 +325,8 @@ def send_host_notification_email(
     manage_link: str = ""
 ):
     """Send notification email to host about new booking using professional template"""
-    if not SMTP_USER or not SMTP_PASSWORD:
+    if not all([SMTP_HOST, SMTP_USER, SMTP_PASSWORD, SMTP_FROM_EMAIL]):
+        logger.warning(f"SMTP configuration incomplete (Host: {bool(SMTP_HOST)}, User: {bool(SMTP_USER)}, Pass: {bool(SMTP_PASSWORD)}, From: {bool(SMTP_FROM_EMAIL)}), skipping email")
         return False
     
     try:
