@@ -145,8 +145,25 @@ const IntegrationsPage = () => {
                 } else {
                     toast.error("Failed to initiate Google connection");
                 }
+            } else if (id === "zoom" || id === "teams") {
+                // Zoom & Teams (OAuth)
+                const response = await fetch(`${API}/calendar/${id}/connect`, {
+                    headers: getAuthHeaders()
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.authorization_url) {
+                        window.location.href = data.authorization_url;
+                    } else if (data.message) {
+                        // Fallback for mock/test mode without credentials
+                        toast.success(data.message);
+                        await checkAuth();
+                    }
+                } else {
+                    toast.error(`Failed to initiate ${id === "teams" ? "Microsoft Teams" : "Zoom"} connection`);
+                }
             } else {
-                // Outlook, Apple, Zoom, Teams
+                // Outlook, Apple (Mock/Direct)
                 const response = await fetch(`${API}/calendar/${id}/connect`, {
                     method: "POST",
                     headers: getAuthHeaders()
