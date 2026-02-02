@@ -1004,13 +1004,18 @@ async def apple_calendar_disconnect(user: dict = Depends(get_current_user)):
 @api_router.get("/calendar/zoom/connect")
 async def zoom_connect(request: Request, user: dict = Depends(get_current_user)):
     """Initiate Zoom OAuth flow"""
-    origin = request.headers.get("origin", "")
-    if not origin:
+    # Get frontend origin for final redirect
+    frontend_origin = request.headers.get("origin", "")
+    if not frontend_origin:
         referer = request.headers.get("referer", "")
         if referer:
             from urllib.parse import urlparse
             parsed = urlparse(referer)
-            origin = f"{parsed.scheme}://{parsed.netloc}"
+            frontend_origin = f"{parsed.scheme}://{parsed.netloc}"
+    
+    # Default to production frontend if not found
+    if not frontend_origin or "localhost" not in frontend_origin:
+        frontend_origin = "https://deemeet.in"
             
     if not ZOOM_CLIENT_ID or not ZOOM_CLIENT_SECRET:
          # Fallback to mock if credentials not set
@@ -1020,9 +1025,10 @@ async def zoom_connect(request: Request, user: dict = Depends(get_current_user))
         )
         return {"authorization_url": None, "message": "Zoom connected (mock - no credentials)"}
 
-    # Ensure no trailing slash on origin
-    origin = origin.rstrip("/")
-    redirect_uri = f"{origin}/api/calendar/zoom/callback"
+    # IMPORTANT: redirect_uri must be the BACKEND API URL, not frontend
+    # Zoom will callback to the backend, then backend redirects to frontend
+    backend_url = "https://klevercal-api-721707771890.us-central1.run.app"
+    redirect_uri = f"{backend_url}/api/calendar/zoom/callback"
     
     # Zoom OAuth URL construction
     params = {
@@ -1033,18 +1039,16 @@ async def zoom_connect(request: Request, user: dict = Depends(get_current_user))
     from urllib.parse import urlencode
     authorization_url = f"https://zoom.us/oauth/authorize?{urlencode(params)}"
     
-    # Store state (Zoom doesn't strictly require random state for flow init like Google lib, but good practice)
-    # We use 'state' query param if we were generating it, but Zoom URL just takes redirect.
-    # We'll rely on the redirect handling the code exchange.
-    # Note: For security, a real production app should generate a state, pass it to Zoom, and verify on callback.
-    # Zoom supports 'state' parameter.
+    # Generate state for security
     state = uuid.uuid4().hex
     authorization_url += f"&state={state}"
 
+    # Store state with user_id and frontend_origin for callback
     await db.oauth_states.insert_one({
         "state": state,
         "user_id": user["user_id"],
         "redirect_uri": redirect_uri,
+        "frontend_origin": frontend_origin,  # Store frontend URL for final redirect
         "provider": "zoom",
         "created_at": datetime.now(timezone.utc).isoformat()
     })
@@ -1058,17 +1062,19 @@ async def zoom_callback(code: str, request: Request, state: Optional[str] = None
     
     if not state:
         logger.warning("Zoom callback missing state parameter")
-        raise HTTPException(status_code=400, detail="Missing state parameter")
+        # Redirect to frontend with error
+        return RedirectResponse(url="https://deemeet.in/integrations?error=missing_state")
 
     state_record = await db.oauth_states.find_one({"state": state, "provider": "zoom"}, {"_id": 0})
     
     # Validation
     if not state_record:
          logger.warning(f"Zoom callback: invalid state {state}")
-         raise HTTPException(status_code=400, detail="Invalid state")
+         return RedirectResponse(url="https://deemeet.in/integrations?error=invalid_state")
 
     user_id = state_record["user_id"]
     redirect_uri = state_record["redirect_uri"]
+    frontend_origin = state_record.get("frontend_origin", "https://deemeet.in")
     await db.oauth_states.delete_one({"state": state})
 
     try:
@@ -1092,7 +1098,7 @@ async def zoom_callback(code: str, request: Request, state: Optional[str] = None
             
             if token_resp.status_code != 200:
                 logger.error(f"Zoom Token exchange failed: {token_resp.text}")
-                raise HTTPException(status_code=400, detail="Failed to exchange Zoom code")
+                return RedirectResponse(url=f"{frontend_origin}/integrations?error=token_exchange_failed")
             
             tokens = token_resp.json()
             
@@ -1109,19 +1115,14 @@ async def zoom_callback(code: str, request: Request, state: Optional[str] = None
             }}
         )
         
-        # Determine origin from redirect_uri for final redirect
-        # origin/api/... -> origin
-        origin = redirect_uri.split("/api")[0]
+        logger.info(f"Zoom connected successfully for user {user_id}")
         
-        return {
-            "status": "success",
-            "message": "Zoom connected successfully",
-            "redirect_url": f"{origin}/integrations"
-        }
+        # Redirect to frontend integrations page with success indicator
+        return RedirectResponse(url=f"{frontend_origin}/integrations?zoom=connected")
 
     except Exception as e:
         logger.error(f"Zoom OAuth error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return RedirectResponse(url=f"{frontend_origin}/integrations?error=oauth_failed")
 
 @api_router.post("/calendar/zoom/disconnect")
 async def zoom_disconnect(user: dict = Depends(get_current_user)):
@@ -1135,13 +1136,18 @@ async def zoom_disconnect(user: dict = Depends(get_current_user)):
 @api_router.get("/calendar/teams/connect")
 async def teams_connect(request: Request, user: dict = Depends(get_current_user)):
     """Initiate MS Teams OAuth flow"""
-    origin = request.headers.get("origin", "")
-    if not origin:
+    # Get frontend origin for final redirect
+    frontend_origin = request.headers.get("origin", "")
+    if not frontend_origin:
         referer = request.headers.get("referer", "")
         if referer:
             from urllib.parse import urlparse
             parsed = urlparse(referer)
-            origin = f"{parsed.scheme}://{parsed.netloc}"
+            frontend_origin = f"{parsed.scheme}://{parsed.netloc}"
+    
+    # Default to production frontend if not found
+    if not frontend_origin or "localhost" not in frontend_origin:
+        frontend_origin = "https://deemeet.in"
 
     if not TEAMS_CLIENT_ID or not TEAMS_CLIENT_SECRET:
         # Mock fallback
@@ -1151,27 +1157,31 @@ async def teams_connect(request: Request, user: dict = Depends(get_current_user)
         )
         return {"authorization_url": None, "message": "Teams connected (mock - no credentials)"}
 
-    redirect_uri = f"{origin}/api/calendar/teams/callback"
+    # IMPORTANT: redirect_uri must be the BACKEND API URL
+    backend_url = "https://klevercal-api-721707771890.us-central1.run.app"
+    redirect_uri = f"{backend_url}/api/calendar/teams/callback"
     
     # MS Identity Platform (v2.0)
     # Scopes: OnlineMeetings.ReadWrite, User.Read, offline_access
     scope = "OnlineMeetings.ReadWrite User.Read offline_access"
     
+    state = uuid.uuid4().hex
     params = {
         "client_id": TEAMS_CLIENT_ID,
         "response_type": "code",
         "redirect_uri": redirect_uri,
         "response_mode": "query",
         "scope": scope,
-        "state": uuid.uuid4().hex  # Generate state
+        "state": state
     }
     from urllib.parse import urlencode
     authorization_url = f"https://login.microsoftonline.com/{TEAMS_TENANT_ID}/oauth2/v2.0/authorize?{urlencode(params)}"
     
     await db.oauth_states.insert_one({
-        "state": params["state"],
+        "state": state,
         "user_id": user["user_id"],
         "redirect_uri": redirect_uri,
+        "frontend_origin": frontend_origin,
         "provider": "teams",
         "created_at": datetime.now(timezone.utc).isoformat()
     })
@@ -1183,10 +1193,11 @@ async def teams_callback(code: str, state: str, request: Request):
     """Handle Teams OAuth callback"""
     state_record = await db.oauth_states.find_one({"state": state, "provider": "teams"}, {"_id": 0})
     if not state_record:
-         raise HTTPException(status_code=400, detail="Invalid state")
+         return RedirectResponse(url="https://deemeet.in/integrations?error=invalid_state")
 
     user_id = state_record["user_id"]
     redirect_uri = state_record["redirect_uri"]
+    frontend_origin = state_record.get("frontend_origin", "https://deemeet.in")
     await db.oauth_states.delete_one({"state": state})
     
     try:
@@ -1205,7 +1216,7 @@ async def teams_callback(code: str, state: str, request: Request):
             
             if token_resp.status_code != 200:
                 logger.error(f"Teams Token exchange failed: {token_resp.text}")
-                raise HTTPException(status_code=400, detail="Failed to exchange Teams code")
+                return RedirectResponse(url=f"{frontend_origin}/integrations?error=token_exchange_failed")
             
             tokens = token_resp.json()
             
@@ -1222,16 +1233,12 @@ async def teams_callback(code: str, state: str, request: Request):
             }}
         )
         
-        origin = redirect_uri.split("/api")[0]
-        return {
-            "status": "success",
-            "message": "Microsoft Teams connected successfully",
-            "redirect_url": f"{origin}/integrations"
-        }
+        logger.info(f"Microsoft Teams connected successfully for user {user_id}")
+        return RedirectResponse(url=f"{frontend_origin}/integrations?teams=connected")
 
     except Exception as e:
         logger.error(f"Teams OAuth error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return RedirectResponse(url=f"{frontend_origin}/integrations?error=oauth_failed")
 
 @api_router.post("/calendar/teams/disconnect")
 async def teams_disconnect(user: dict = Depends(get_current_user)):

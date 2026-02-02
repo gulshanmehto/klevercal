@@ -1,0 +1,57 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  🔧 ZOOM INTEGRATION FIX - CORRECTED ✅
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️  IMPORTANT: My earlier instructions were WRONG. 
+    OAuth callbacks go to BACKEND, not frontend!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 CORRECT SETUP - DO THIS:
+
+1. Go to: https://marketplace.zoom.us/develop/apps
+2. Click your app (Client ID: MyNO9r3cTb6A2RN6amZ7vg)
+3. Navigate to: OAuth > Redirect URLs
+
+4. ADD this BACKEND URL (copy-paste exactly):
+   ✅ https://klevercal-api-721707771890.us-central1.run.app/api/calendar/zoom/callback
+   ✅ http://localhost:8000/api/calendar/zoom/callback
+
+5. REMOVE these frontend URLs if present:
+   ❌ https://deemeet.in/api/calendar/zoom/callback
+   ❌ https://www.deemeet.in/api/calendar/zoom/callback
+   ❌ http://localhost:3000/api/calendar/zoom/callback
+
+6. Click SAVE
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 WHY THIS IS CORRECT:
+
+✅ Zoom redirects to BACKEND (not frontend!)
+✅ Backend exchanges code for tokens
+✅ Backend saves tokens to database
+✅ Backend redirects user to frontend
+✅ User sees success message on deemeet.in
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔧 WHAT I FIXED IN THE CODE:
+
+✅ Backend now uses backend URL for redirect_uri
+✅ Backend callback uses RedirectResponse
+✅ Removed incorrect frontend callback pages
+✅ Applied same fix to Teams integration
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧪 AFTER FIXING ZOOM APP SETTINGS:
+
+1. Deploy backend changes (if not auto-deployed)
+2. Go to https://deemeet.in/integrations
+3. Click "Connect" on Zoom
+4. Authorize on Zoom
+5. You'll be redirected back to deemeet.in
+6. Success! Zoom connected 🎉
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
