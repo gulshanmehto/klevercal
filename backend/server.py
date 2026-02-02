@@ -25,6 +25,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, File, UploadFile
 import shutil
 import json
+from email_templates import get_guest_confirmation_template, get_host_notification_template
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -60,7 +61,15 @@ TEAMS_CLIENT_ID = os.environ.get('TEAMS_CLIENT_ID', '')
 TEAMS_CLIENT_SECRET = os.environ.get('TEAMS_CLIENT_SECRET', '')
 TEAMS_TENANT_ID = os.environ.get('TEAMS_TENANT_ID', 'common')
 
-# Gmail SMTP Settings
+# SMTP Email Settings (supports Gmail, SendGrid, Zoho, etc.)
+SMTP_HOST = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '465'))
+SMTP_USER = os.environ.get('SMTP_USER', os.environ.get('GMAIL_ADDRESS', ''))
+SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', os.environ.get('GMAIL_APP_PASSWORD', ''))
+SMTP_FROM_EMAIL = os.environ.get('SMTP_FROM_EMAIL', 'notifications@deemeet.in')
+SMTP_FROM_NAME = os.environ.get('SMTP_FROM_NAME', 'DeeMeet')
+
+# Legacy Gmail settings (for backward compatibility)
 GMAIL_ADDRESS = os.environ.get('GMAIL_ADDRESS', '')
 GMAIL_APP_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD', '')
 
@@ -219,11 +228,14 @@ def send_booking_confirmation_email(
     duration: int,
     notes: str = "",
     location: str = "Google Meet",
-    meeting_link: Optional[str] = None
+    meeting_link: Optional[str] = None,
+    host_email: str = "",
+    reschedule_link: str = "",
+    cancel_link: str = ""
 ):
-    """Send booking confirmation email via Gmail SMTP"""
-    if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
-        logger.warning("Gmail credentials not configured, skipping email")
+    """Send booking confirmation email to guest using professional template"""
+    if not SMTP_USER or not SMTP_PASSWORD:
+        logger.warning("SMTP credentials not configured, skipping email")
         return False
     
     try:
@@ -231,110 +243,70 @@ def send_booking_confirmation_email(
         date_str = start_time.strftime("%A, %B %d, %Y")
         time_str = f"{start_time.strftime('%I:%M %p')} - {end_time.strftime('%I:%M %p')}"
         
-        # Create email content
+        # Create email subject
         subject = f"Confirmed: {meeting_title} with {host_name}"
         
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body {{ font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #334155; }}
-                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                .header {{ background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; }}
-                .content {{ background: #f8fafc; padding: 30px; border-radius: 0 0 12px 12px; }}
-                .meeting-card {{ background: white; border-radius: 12px; padding: 24px; margin: 20px 0; border: 1px solid #e2e8f0; }}
-                .detail-row {{ display: flex; margin: 12px 0; }}
-                .detail-label {{ color: #64748b; width: 100px; }}
-                .detail-value {{ color: #1e293b; font-weight: 500; }}
-                .footer {{ text-align: center; color: #94a3b8; font-size: 12px; margin-top: 20px; }}
-                .btn {{ display: inline-block; background: #7c3aed; color: white; padding: 12px 24px; border-radius: 25px; text-decoration: none; margin-top: 15px; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1 style="margin: 0; font-size: 24px;">✓ Meeting Confirmed!</h1>
-                    <p style="margin: 10px 0 0 0; opacity: 0.9;">Your meeting has been scheduled</p>
-                </div>
-                <div class="content">
-                    <p>Hi {guest_name},</p>
-                    <p>Your meeting with <strong>{host_name}</strong> has been confirmed.</p>
-                    
-                    <div class="meeting-card">
-                        <h2 style="margin: 0 0 20px 0; color: #7c3aed;">{meeting_title}</h2>
-                        <div class="detail-row">
-                            <span class="detail-label">📅 Date:</span>
-                            <span class="detail-value">{date_str}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">🕐 Time:</span>
-                            <span class="detail-value">{time_str}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">⏱️ Duration:</span>
-                            <span class="detail-value">{duration} minutes</span>
-                        </div>
-                        {f'<div class="detail-row"><span class="detail-label">📝 Notes:</span><span class="detail-value">{notes}</span></div>' if notes else ''}
-                        <div class="detail-row">
-                            <span class="detail-label">📍 Location:</span>
-                            <span class="detail-value">{location}</span>
-                        </div>
-                        {f'<div style="text-align: center; margin-top: 25px;"><a href="{meeting_link}" class="btn">🎥 Join Meeting</a></div>' if meeting_link else ''}
-                    </div>
-                    
-                    <p>A calendar invite will be sent separately. Please add this to your calendar.</p>
-                    
-                    <p style="color: #64748b; font-size: 14px;">
-                        Need to reschedule or cancel? Reply to this email.
-                    </p>
-                </div>
-                <div class="footer">
-                    <p>Powered by DeeMeet - Smart Scheduling</p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
+        # Get professional HTML template
+        html_content = get_guest_confirmation_template(
+            guest_name=guest_name,
+            host_name=host_name,
+            meeting_title=meeting_title,
+            date_str=date_str,
+            time_str=time_str,
+            duration=duration,
+            location=location,
+            meeting_link=meeting_link,
+            notes=notes,
+            host_email=host_email,
+            reschedule_link=reschedule_link,
+            cancel_link=cancel_link
+        )
         
         # Plain text fallback
         text_content = f"""
-Meeting Confirmed!
+You're scheduled!
 
 Hi {guest_name},
 
-Your meeting with {host_name} has been confirmed.
+A new event has been scheduled.
 
-Meeting: {meeting_title}
-Date: {date_str}
-Time: {time_str}
-Duration: {duration} minutes
-Location: {location}
+Event: {meeting_title}
+Host: {host_name}
+When: {time_str} - {date_str}
+Where: {location}
 {f'Meeting Link: {meeting_link}' if meeting_link else ''}
-{f'Notes: {notes}' if notes else ''}
+{f'Description: {notes}' if notes else ''}
 
-A calendar invite will be sent separately.
+A calendar invitation has been sent to your email address.
 
-Need to reschedule or cancel? Reply to this email.
+Need to make changes? Please use the reschedule or cancel options, or reply to this email.
 
-Powered by DeeMeet
+Powered by DeeMeet - Smart scheduling made simple
         """
         
         # Create message
         msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
-        msg['From'] = f"DeeMeet <{GMAIL_ADDRESS}>"
+        msg['From'] = f"{SMTP_FROM_NAME} <{SMTP_FROM_EMAIL}>"
         msg['To'] = to_email
         
         msg.attach(MIMEText(text_content, 'plain'))
         msg.attach(MIMEText(html_content, 'html'))
         
-        # Send email
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
-            server.send_message(msg)
+        # Send email using configured SMTP
+        if SMTP_PORT == 465:
+            # Use SSL
+            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.send_message(msg)
+        else:
+            # Use TLS (typically port 587)
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+                server.starttls()
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.send_message(msg)
         
-        logger.info(f"Confirmation email sent to {to_email}")
+        logger.info(f"Confirmation email sent to {to_email} from {SMTP_FROM_EMAIL}")
         return True
         
     except Exception as e:
@@ -349,13 +321,15 @@ def send_host_notification_email(
     meeting_title: str,
     start_time: datetime,
     end_time: datetime,
+    duration: int,
     notes: str = "",
     guest_phone: Optional[str] = None,
     location: str = "Google Meet",
-    meeting_link: Optional[str] = None
+    meeting_link: Optional[str] = None,
+    manage_link: str = ""
 ):
-    """Send notification email to host about new booking"""
-    if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
+    """Send notification email to host about new booking using professional template"""
+    if not SMTP_USER or not SMTP_PASSWORD:
         return False
     
     try:
@@ -364,60 +338,66 @@ def send_host_notification_email(
         
         subject = f"New Booking: {meeting_title} with {guest_name}"
         
-        phone_html = f"<p><strong>Phone:</strong> {guest_phone}</p>" if guest_phone else ""
+        # Get professional HTML template
+        html_content = get_host_notification_template(
+            host_name=host_name,
+            guest_name=guest_name,
+            guest_email=guest_email,
+            guest_phone=guest_phone or "",
+            meeting_title=meeting_title,
+            date_str=date_str,
+            time_str=time_str,
+            duration=duration,
+            location=location,
+            meeting_link=meeting_link,
+            notes=notes,
+            manage_link=manage_link
+        )
+        
+        # Plain text fallback
+        text_content = f"""
+New Event Scheduled
 
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body {{ font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #334155; }}
-                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                .header {{ background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; }}
-                .content {{ background: #f8fafc; padding: 30px; border-radius: 0 0 12px 12px; }}
-                .meeting-card {{ background: white; border-radius: 12px; padding: 24px; margin: 20px 0; border: 1px solid #e2e8f0; }}
-                .footer {{ text-align: center; color: #94a3b8; font-size: 12px; margin-top: 20px; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1 style="margin: 0; font-size: 24px;">📅 New Booking!</h1>
-                </div>
-                <div class="content">
-                    <p>Hi {host_name},</p>
-                    <p>You have a new meeting scheduled:</p>
-                    
-                    <div class="meeting-card">
-                        <h2 style="margin: 0 0 20px 0; color: #7c3aed;">{meeting_title}</h2>
-                        <p><strong>Guest:</strong> {guest_name} ({guest_email})</p>
-                        {phone_html}
-                        <p><strong>Date:</strong> {date_str}</p>
-                        <p><strong>Time:</strong> {time_str}</p>
-                        <p><strong>Location:</strong> {location}</p>
-                        {f'<p><strong>Meeting Link:</strong> <a href="{meeting_link}">{meeting_link}</a></p>' if meeting_link else ''}
-                        {f'<p><strong>Notes:</strong> {notes}</p>' if notes else ''}
-                    </div>
-                </div>
-                <div class="footer">
-                    <p>Powered by DeeMeet</p>
-                </div>
-            </div>
-        </body>
-        </html>
+Hi {host_name},
+
+A new event has been scheduled.
+
+Event: {meeting_title}
+Invitee: {guest_name}
+Email: {guest_email}
+{f'Phone: {guest_phone}' if guest_phone else ''}
+When: {time_str} - {date_str}
+Duration: {duration} min
+Where: {location}
+{f'Meeting Link: {meeting_link}' if meeting_link else ''}
+{f'Description: {notes}' if notes else ''}
+
+Let's see how we can collaborate for success!
+
+Powered by DeeMeet - Smart scheduling made simple
         """
         
         msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
-        msg['From'] = f"DeeMeet <{GMAIL_ADDRESS}>"
+        msg['From'] = f"{SMTP_FROM_NAME} <{SMTP_FROM_EMAIL}>"
         msg['To'] = host_email
+        msg.attach(MIMEText(text_content, 'plain'))
         msg.attach(MIMEText(html_content, 'html'))
         
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
-            server.send_message(msg)
+        # Send email using configured SMTP
+        if SMTP_PORT == 465:
+            # Use SSL
+            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.send_message(msg)
+        else:
+            # Use TLS (typically port 587)
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+                server.starttls()
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.send_message(msg)
         
-        logger.info(f"Host notification sent to {host_email}")
+        logger.info(f"Host notification sent to {host_email} from {SMTP_FROM_EMAIL}")
         return True
         
     except Exception as e:
@@ -1695,6 +1675,7 @@ async def create_appointment(data: AppointmentCreate):
         meeting_title=bt["title"],
         start_time=data.start_time,
         end_time=end_time,
+        duration=bt["duration"],
         notes=data.notes or "",
         location=location_label,
         meeting_link=meeting_link
