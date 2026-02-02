@@ -40,7 +40,7 @@ SMTP_HOST          # SMTP server address
 SMTP_PORT          # Port (465 for SSL, 587 for TLS)
 SMTP_USER          # SMTP username
 SMTP_PASSWORD      # SMTP password or API key
-SMTP_FROM_EMAIL    # From email (notifications@deemeet.in)
+SMTP_FROM_EMAIL    # From email (notifications@deemeet.app)
 SMTP_FROM_NAME     # From name (DeeMeet)
 ```
 
@@ -103,7 +103,7 @@ Both functions updated to use professional templates:
    SMTP_PORT=465
    SMTP_USER=your-gmail@gmail.com
    SMTP_PASSWORD=your-app-password
-   SMTP_FROM_EMAIL=notifications@deemeet.in
+   SMTP_FROM_EMAIL=notifications@deemeet.app
    SMTP_FROM_NAME=DeeMeet
 ```
 
@@ -117,7 +117,7 @@ Both functions updated to use professional templates:
    SMTP_PORT=587
    SMTP_USER=apikey
    SMTP_PASSWORD=your-api-key
-   SMTP_FROM_EMAIL=notifications@deemeet.in
+   SMTP_FROM_EMAIL=notifications@deemeet.app
    SMTP_FROM_NAME=DeeMeet
 ```
 
@@ -230,7 +230,7 @@ Both functions updated to use professional templates:
 ## 🎯 Key Benefits
 
 ✅ **Professional appearance** - Matches modern SaaS applications
-✅ **Brand consistency** - All emails from notifications@deemeet.in
+✅ **Brand consistency** - All emails from notifications@deemeet.app
 ✅ **Better deliverability** - HTML + plain text fallback
 ✅ **Mobile responsive** - Looks great on all devices
 ✅ **Easy customization** - Templates separated in email_templates.py
@@ -241,7 +241,7 @@ Both functions updated to use professional templates:
 
 ## 📝 Notes
 
-- Emails are sent from: **notifications@deemeet.in**
+- Emails are sent from: **notifications@deemeet.app**
 - SMTP credentials are required (see setup guides)
 - Both guest and host receive emails automatically
 - Google Meet links are automatically included when applicable
