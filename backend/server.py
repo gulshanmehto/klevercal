@@ -1020,6 +1020,8 @@ async def zoom_connect(request: Request, user: dict = Depends(get_current_user))
         )
         return {"authorization_url": None, "message": "Zoom connected (mock - no credentials)"}
 
+    # Ensure no trailing slash on origin
+    origin = origin.rstrip("/")
     redirect_uri = f"{origin}/api/calendar/zoom/callback"
     
     # Zoom OAuth URL construction
