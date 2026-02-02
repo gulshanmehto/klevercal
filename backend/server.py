@@ -1651,6 +1651,7 @@ async def create_appointment(data: AppointmentCreate):
     await db.appointments.insert_one(doc)
     
     # Send confirmation emails
+    logger.info("📧 ATTEMPTING EMAIL SEND - VERSION: SMTP_PRO_V1")
     send_booking_confirmation_email(
         to_email=data.guest_email,
         guest_name=data.guest_name,
