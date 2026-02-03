@@ -1012,7 +1012,7 @@ async def zoom_connect(request: Request, user: dict = Depends(get_current_user))
 
     # IMPORTANT: redirect_uri must be the BACKEND API URL, not frontend
     # Zoom will callback to the backend, then backend redirects to frontend
-    backend_url = "https://klevercal-api-721707771890.us-central1.run.app"
+    backend_url = "https://api.deemeet.in"
     redirect_uri = f"{backend_url}/api/calendar/zoom/callback"
     
     # Zoom OAuth URL construction
@@ -1143,7 +1143,7 @@ async def teams_connect(request: Request, user: dict = Depends(get_current_user)
         return {"authorization_url": None, "message": "Teams connected (mock - no credentials)"}
 
     # IMPORTANT: redirect_uri must be the BACKEND API URL
-    backend_url = "https://klevercal-api-721707771890.us-central1.run.app"
+    backend_url = "https://api.deemeet.in"
     redirect_uri = f"{backend_url}/api/calendar/teams/callback"
     
     # MS Identity Platform (v2.0)
