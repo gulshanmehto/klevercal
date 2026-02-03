@@ -1961,10 +1961,14 @@ async def test_email(user: dict = Depends(get_current_user)):
         end_time=datetime.now(timezone.utc) + timedelta(hours=24, minutes=30),
         duration=30,
         notes="This is a test email"
-    )
     return {"success": success, "message": "Test email sent" if success else "Failed to send email"}
 
 # ==================== ROOT ====================
+
+@app.get("/ZOOM_verify_54e574a646e24cfab666a61e79315ae8.html")
+async def zoom_verification():
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content="ZOOM_verify_54e574a646e24cfab666a61e79315ae8", status_code=200)
 
 @api_router.get("/")
 async def root():
