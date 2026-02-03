@@ -143,17 +143,17 @@ class BookingTypeResponse(BaseModel):
     booking_type_id: str
     user_id: str
     title: str
-    description: str
+    description: Optional[str] = ""
     duration: int
     color: str
     is_active: bool
     buffer_before: int
     buffer_after: int
     min_notice: int
-    max_bookings_per_day: Optional[int]
-    questions: List[Dict[str, Any]]
-    location_type: str
-    location_details: Optional[str]
+    max_bookings_per_day: Optional[int] = None
+    questions: List[Dict[str, Any]] = []
+    location_type: Optional[str] = "google_meet"
+    location_details: Optional[str] = ""
     slug: str
     created_at: datetime
 
