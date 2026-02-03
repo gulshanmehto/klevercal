@@ -1319,8 +1319,30 @@ async def create_booking_type(data: BookingTypeCreate, user: dict = Depends(get_
 
 @api_router.get("/booking-types", response_model=List[BookingTypeResponse])
 async def get_booking_types(user: dict = Depends(get_current_user)):
-    types = await db.booking_types.find({"user_id": user["user_id"]}, {"_id": 0}).to_list(100)
-    return [BookingTypeResponse(**{**t, "created_at": datetime.fromisoformat(t["created_at"]) if isinstance(t["created_at"], str) else t["created_at"]}) for t in types]
+    try:
+        types = await db.booking_types.find({"user_id": user["user_id"]}, {"_id": 0}).to_list(100)
+        
+        # Safe date parsing
+        formatted_types = []
+        for t in types:
+            created_at = t.get("created_at")
+            if isinstance(created_at, str):
+                try:
+                    # Remove 'Z' and try to parse
+                    clean_date = created_at.replace('Z', '+00:00')
+                    t["created_at"] = datetime.fromisoformat(clean_date)
+                except Exception:
+                    t["created_at"] = datetime.now(timezone.utc)
+            elif not created_at:
+                t["created_at"] = datetime.now(timezone.utc)
+            
+            formatted_types.append(BookingTypeResponse(**t))
+            
+        return formatted_types
+    except Exception as e:
+        logger.error(f"Error loading booking types: {str(e)}")
+        # Return empty list instead of crashing the page
+        return []
 
 @api_router.get("/booking-types/{booking_type_id}", response_model=BookingTypeResponse)
 async def get_booking_type(booking_type_id: str, user: dict = Depends(get_current_user)):
