@@ -28,12 +28,19 @@ import json
 from email_templates import get_guest_confirmation_template, get_host_notification_template
 
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+# Load .env if it exists (local dev), otherwise use system env (production)
+if (ROOT_DIR / '.env').exists():
+    load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+# MongoDB connection - using get() to avoid KeyError crash
+MONGO_URL = os.environ.get('MONGO_URL', '')
+DB_NAME = os.environ.get('DB_NAME', 'klevercal')
+
+if not MONGO_URL:
+    logger.error("❌ MONGO_URL not found in environment variables!")
+
+client = AsyncIOMotorClient(MONGO_URL) if MONGO_URL else None
+db = client[DB_NAME] if client else None
 
 # JWT Settings
 JWT_SECRET = os.environ.get('JWT_SECRET', 'klevercal-secret-key-change-in-production')
