@@ -323,7 +323,7 @@
 ### Primary Database
 - **MongoDB Atlas**
   - Cloud-hosted NoSQL database
-  - Connection: `mongodb+srv://gulshanmehto:rBvD0y3GOpodXOiS@klevercal.9ajzkhh.mongodb.net/`
+  - Connection: `mongodb+srv://<username>:<password>@klevercal.9ajzkhh.mongodb.net/`
   - Database Name: `klevercal`
   - Cluster: `klevercal.9ajzkhh.mongodb.net`
   - Collections:
